@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Orchestrator</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-logo">Agent Orchestrator</div>
+  <div class="topnav-tabs">
+    <div class="nav-item active" data-view="overview">
+      <span class="nav-label">Overview</span>
+    </div>
+    <div class="nav-item" data-view="work">
+      <span class="nav-label">Work</span>
+      <span class="nav-badge" id="nav-work-count" style="display:none">0</span>
+    </div>
+    <div class="nav-item" data-view="exceptions">
+      <span class="nav-label">Exceptions</span>
+      <span class="nav-badge" id="nav-exc-count" style="display:none">0</span>
+    </div>
+    <div class="nav-item" data-view="system">
+      <span class="nav-label">System</span>
+    </div>
+  </div>
+  <div class="phase-indicator" id="phase-indicator">
+    <div class="phase-step inactive" data-phase="pm"><span class="phase-num">1</span><span class="phase-label">PM</span></div>
+    <div class="phase-connector"></div>
+    <div class="phase-step inactive" data-phase="architect"><span class="phase-num">2</span><span class="phase-label">Architect</span></div>
+    <div class="phase-connector"></div>
+    <div class="phase-step inactive" data-phase="developer"><span class="phase-num">3</span><span class="phase-label">Developer</span></div>
+    <div class="phase-connector"></div>
+    <div class="phase-step inactive" data-phase="reviewer"><span class="phase-num">4</span><span class="phase-label">Reviewer</span></div>
+  </div>
+  <div class="topnav-right">
+    <div class="status-dot" id="sb-dot"></div>
+    <span id="sb-status">Connecting...</span>
+    <span id="sb-uptime" style="margin-left:8px"></span>
+    <span id="topbar-time" style="margin-left:8px"></span>
+  </div>
+</nav>
+
+<div class="main">
+  <div class="content">
+
+    <!-- OVERVIEW — Status brief -->
+    <div class="view active" id="view-overview">
+      <!-- First-run orientation (hidden once data arrives) -->
+      <div class="first-run" id="first-run">
+        <h2>Agent Orchestrator</h2>
+        <p>This dashboard shows what your AI agents are doing. <strong>Overview</strong> is your status brief. <strong>Work</strong> is where you supervise threads. <strong>Exceptions</strong> shows what needs action. <strong>System</strong> is for diagnostics.</p>
+        <p style="color:var(--subtle);margin-top:4px">Waiting for the orchestrator to connect...</p>
+      </div>
+
+      <!-- 1. Status summary — one-sentence system state -->
+      <div id="status-brief" class="status-brief"></div>
+
+      <!-- 2. Attention — 5 items max, links into Work/Exceptions -->
+      <div id="attention-brief"></div>
+
+      <!-- 3. Outcomes — shipped, active, blocked, cost -->
+      <div class="grid g4" id="outcome-tiles"></div>
+
+      <!-- 4. Agent status strip — compact, not a full diagram -->
+      <div id="agent-strip" class="agent-strip"></div>
+
+      <!-- 5. Recent workflow changes -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><h3>Recent Changes</h3></div>
+        <div class="card-body"><div id="recent-changes"><div class="empty loading-pulse">Connecting to orchestrator...</div></div></div>
+      </div>
+
+      <!-- 6. PRs (only shown when there are PRs) -->
+      <div class="card" id="pr-card" style="display:none;margin-bottom:16px">
+        <div class="card-head"><h3>Pull Requests</h3></div>
+        <div class="card-body" id="pr-body"></div>
+      </div>
+
+      <!-- 7. Error Summary (collapsible) -->
+      <div class="card error-summary-panel" id="error-summary-panel" style="margin-bottom:16px">
+        <div class="card-head error-summary-head" onclick="toggleErrorPanel()">
+          <h3>Error Summary</h3>
+          <span class="error-summary-toggle" id="error-summary-toggle">&#9660;</span>
+        </div>
+        <div class="card-body error-summary-body" id="error-summary-body">
+          <div id="error-summary-content"><div class="empty">No recent errors</div></div>
+        </div>
+      </div>
+
+      <!-- 8. System Health — verdict only, full detail in System view -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-head"><h3>System Health</h3></div>
+        <div class="card-body"><div id="audit-container"><div class="empty loading-pulse">Connecting to orchestrator...</div></div></div>
+      </div>
+    </div>
+
+    <!-- WORK -->
+    <div class="view" id="view-work">
+      <p class="view-desc">Each thread is one improvement flowing through the pipeline. A thread may go through multiple proposal rounds before shipping.</p>
+      <div class="work-header">
+        <div class="work-filters" id="work-filters">
+          <button class="filter-btn active" data-filter="all">All</button>
+          <button class="filter-btn" data-filter="active">Active</button>
+          <button class="filter-btn" data-filter="rework">Rework</button>
+          <button class="filter-btn" data-filter="completed">Completed</button>
+          <button class="filter-btn" data-filter="failed">Failed</button>
+        </div>
+        <span class="ch-count" id="thread-count">0</span>
+      </div>
+      <div id="work-list" class="work-list"><div class="empty loading-pulse">Connecting to orchestrator...</div></div>
+      <!-- Thread detail overlay -->
+      <div class="overlay" id="thread-overlay" style="display:none">
+        <div class="overlay-backdrop" onclick="closeThreadDetail()"></div>
+        <div class="overlay-card">
+          <div class="card-head"><h3>Thread <span id="thread-detail-id"></span></h3><button class="close-btn" onclick="closeThreadDetail()">Close</button></div>
+          <div class="card-body">
+            <div id="thread-detail-mode"></div>
+            <div id="thread-narrative"></div>
+            <div id="thread-latest-change"></div>
+            <div id="thread-challenger"></div>
+            <div id="thread-summary"></div>
+            <div id="thread-workflow-panel">
+              <h4 class="timeline-heading">Proposal History</h4>
+              <div class="timeline" id="thread-detail-body"></div>
+            </div>
+            <div id="thread-transcript"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EXCEPTIONS -->
+    <div class="view" id="view-exceptions">
+      <p class="view-desc">Items that need your attention or action right now.</p>
+      <div class="exc-section" id="exc-approvals"></div>
+      <div class="exc-section" id="exc-failed-prs"></div>
+      <div class="exc-section" id="exc-blocked"></div>
+      <div class="exc-section" id="exc-stale"></div>
+    </div>
+
+    <!-- SYSTEM -->
+    <div class="view" id="view-system">
+      <p class="view-desc">Agent health, telemetry, and infrastructure state.</p>
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-sub="sys-agents">Agents</button>
+        <button class="sub-tab" data-sub="sys-telemetry">Telemetry</button>
+        <button class="sub-tab" data-sub="sys-redis">Advanced</button>
+      </div>
+
+      <!-- Agents sub-view -->
+      <div class="sub-view active" id="sys-agents">
+        <div class="card" style="margin-bottom:16px" id="sys-health-card">
+          <div class="card-head"><h3>System Health</h3></div>
+          <div class="card-body"><div id="audit-full"><div class="empty">No audit data</div></div></div>
+        </div>
+        <div class="agent-cards" id="agents-grid"></div>
+        <!-- Agent detail overlay -->
+        <div class="overlay" id="agent-overlay" style="display:none">
+          <div class="overlay-backdrop" onclick="closeAgentDetail()"></div>
+          <div class="overlay-card">
+            <div class="card-head"><h3 id="agent-detail-title">Agent</h3><button class="close-btn" onclick="closeAgentDetail()">Close</button></div>
+            <div class="card-body">
+              <div id="agent-detail-summary"></div>
+              <div id="agent-detail-body"></div>
+            </div>
+          </div>
+        </div>
+        <div class="pipeline-canvas" id="pipeline-canvas-sys">
+          <svg class="connections" id="pipeline-svg-sys"></svg>
+        </div>
+      </div>
+
+      <!-- Telemetry sub-view -->
+      <div class="sub-view" id="sys-telemetry">
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-head"><h3>AI Interactions Timeline</h3></div>
+          <div class="card-body"><div id="timeline-container"><div class="empty">No AI interactions yet</div></div></div>
+        </div>
+        <div class="grid g2">
+          <div class="card">
+            <div class="card-head"><h3>Metrics</h3></div>
+            <div class="card-body"><div class="metrics-grid" id="metrics-body"><div class="empty loading-pulse">Connecting to orchestrator...</div></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Streams</h3></div>
+            <div class="card-body"><table><thead><tr><th>Stream</th><th>Count</th><th></th></tr></thead><tbody id="streams-body"></tbody></table></div>
+          </div>
+        </div>
+        <div class="panel" id="stream-detail-panel">
+          <div class="panel-in">
+            <div class="panel-top"><h3>Stream: <span id="stream-detail-name"></span></h3><button class="close-btn" onclick="closePanel('stream-detail-panel')">Close</button></div>
+            <div id="stream-detail-body"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Live Event Stream</h3><span class="ch-count" id="event-count">0</span></div>
+          <div class="card-body"><div class="feed feed-full" id="events-feed"><div class="empty loading-pulse">Connecting to orchestrator...</div></div></div>
+        </div>
+      </div>
+
+      <!-- Advanced sub-view (operator-only) -->
+      <div class="sub-view" id="sys-redis">
+        <div class="redis-warning">Advanced operator tools. Changes here directly modify system state and can disrupt running pipelines.</div>
+        <div class="grid g2">
+          <div class="card">
+            <div class="card-head"><h3>Streams</h3></div>
+            <div class="card-body"><table><thead><tr><th>Stream</th><th>Messages</th></tr></thead><tbody id="redis-streams"></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Orchestrator Keys</h3></div>
+            <div class="card-body"><table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody id="redis-orch"></tbody></table></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Agent State</h3></div>
+          <div class="card-body"><table><thead><tr><th>Key</th><th>Value</th></tr></thead><tbody id="redis-agents"></tbody></table></div>
+        </div>
+        <div class="grid g2">
+          <div class="card">
+            <div class="card-head"><h3>Metrics Hash</h3></div>
+            <div class="card-body"><table><thead><tr><th>Field</th><th>Value</th><th></th></tr></thead><tbody id="redis-metrics"></tbody></table></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><h3>Thread Cycles</h3></div>
+            <div class="card-body"><table><thead><tr><th>Thread</th><th>Cycles</th><th></th></tr></thead><tbody id="redis-cycles"></tbody></table></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>PR Audit Trail</h3></div>
+          <div class="card-body"><table><thead><tr><th>Thread</th><th>Status</th><th></th></tr></thead><tbody id="redis-prs"></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head"><h3>Active Work (WIP Sets)</h3></div>
+          <div class="card-body"><div id="redis-active-work"></div></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

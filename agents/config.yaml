@@ -1,0 +1,93 @@
+system:
+  redis_url: "redis://localhost:6379/0"
+  working_dir: "."
+  log_dir: "agents/logs"
+  max_concurrent_tasks: 2
+  once_timeout: 1800
+  max_restarts: 3
+  idle_timeout: 60
+  max_change_rounds: 3
+  cascade_poll_interval: 2
+  restart_delay: 5
+  gate_timeout: 300
+  max_pending_proposals: 3  # PM pauses when this many proposals await architect
+  max_pending_tasks: 3      # Architect holds approvals when this many tasks await developer
+  max_pending_reviews: 5    # Slows upstream (PM triggers + architect tasks) when reviews back up
+
+agents:
+  pm:
+    count: 1
+    cli: claude
+    model: sonnet
+    permission_mode: plan
+    system_prompt: agents/prompts/pm.md
+    subscribes_to: [system, reviews]
+    publishes_to: [proposals, cli-traces]
+    schedule:
+      trigger: startup
+    deliberation:
+      cli: codex
+      model: gpt-5.4
+      reasoning_effort: medium
+      rounds: 2
+
+  architect:
+    count: 1
+    cli: claude
+    model: sonnet
+    permission_mode: plan
+    system_prompt: agents/prompts/architect.md
+    subscribes_to: [proposals]
+    publishes_to: [reviews, tasks, cli-traces]
+    deliberation:
+      cli: codex
+      model: gpt-5.4
+      reasoning_effort: medium
+      rounds: 2
+
+  developer:
+    count: 2          # each developer gets an isolated git worktree
+    cli: claude
+    model: opus
+    permission_mode: acceptEdits
+    system_prompt: agents/prompts/developer.md
+    allowed_tools: "Edit Read Glob Grep Bash(git:*) Bash(python:*) Bash(pytest:*)"
+    subscribes_to: [tasks, review-results]
+    publishes_to: [review-requests, progress, cli-traces]
+    use_consumer_group: true
+
+  reviewer:
+    count: 1
+    cli: codex
+    model: gpt-5.4
+    codex_mode: exec
+    sandbox: read-only
+    reasoning_effort: medium
+    system_prompt: agents/prompts/reviewer.md
+    subscribes_to: [review-requests]
+    publishes_to: [review-results, cli-traces]
+
+safety:
+  blocked_patterns:
+    - "rm -rf"
+    - "git push --force"
+    - "git reset --hard"
+    - "DROP TABLE"
+    - "DELETE FROM"
+  protected_files:
+    - ".env"
+    - "vercel.json"
+    - "agents/config.yaml"
+  branch_prefix: "agent/"
+  never_push_to: ["main", "master"]
+  # Actions that require human approval via `agent-orchestrator approve`.
+  # If the approval console is not running, gated actions will time out
+  # and be blocked after gate_timeout seconds.
+  # Remove items from this list to run fully autonomously.
+  human_approval_required:
+    - delete_files
+    - modify_database
+    - create_pr              # Human reviews before PR is created
+    # - push_to_remote       # Uncomment to gate branch pushes
+    # - large_change         # Uncomment to gate changes exceeding max_files_per_change
+  max_files_per_change: 10

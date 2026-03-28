@@ -1,0 +1,102 @@
+{"timestamp": 1774100530.705152, "incoming_id": "7485a3e0f3f2", "incoming_type": "task_assignment", "response_length": 2663, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774100672.88172, "incoming_id": "cb57d387f49e", "incoming_type": "task_assignment", "response_length": 1184, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774101122.385041, "incoming_id": "d95ba804872b", "incoming_type": "task_assignment", "response_length": 1559, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774118373.756001, "incoming_id": "a797dbef0abf", "incoming_type": "review_result", "response_length": 584, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774118431.654498, "incoming_id": "1cf44bb39fb7", "incoming_type": "review_result", "response_length": 438, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774118560.210512, "incoming_id": "65122c5ce593", "incoming_type": "review_result", "response_length": 1124, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774167868.201637, "incoming_id": "3469bd4a1eaf", "incoming_type": "task_assignment", "response_length": 1741, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774167928.724855, "incoming_id": "d3e2ae632c6a", "incoming_type": "task_assignment", "response_length": 937, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774167957.519125, "incoming_id": "4acd0b05e9d4", "incoming_type": "review_result", "response_length": 1475, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774168082.741235, "incoming_id": "203fc650a0d1", "incoming_type": "review_result", "response_length": 1311, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774168197.78745, "incoming_id": "e4729966d4a6", "incoming_type": "review_result", "response_length": 1146, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774168363.640508, "incoming_id": "3e3249543f49", "incoming_type": "review_result", "response_length": 1648, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774168470.65111, "incoming_id": "3d322835b2a0", "incoming_type": "task_assignment", "response_length": 3094, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774168905.95663, "incoming_id": "e07adcde8c3d", "incoming_type": "review_result", "response_length": 1939, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774168967.7446542, "incoming_id": "850818d9ce1c", "incoming_type": "review_result", "response_length": 680, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774170417.9870138, "incoming_id": "4acd0b05e9d4", "incoming_type": "review_result", "response_length": 1208, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774189762.3711529, "incoming_id": "e47efc527a75", "incoming_type": "task_assignment", "response_length": 1972, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774189898.181901, "incoming_id": "6ab5bef04ad6", "incoming_type": "review_result", "response_length": 1530, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774190975.484666, "incoming_id": "98949b3d215c", "incoming_type": "task_assignment", "response_length": 3665, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774191579.133152, "incoming_id": "66bd2aad666a", "incoming_type": "task_assignment", "response_length": 840, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774191708.6167722, "incoming_id": "0a00d52c1a3b", "incoming_type": "review_result", "response_length": 1396, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774193324.971958, "incoming_id": "9fd50265f3e3", "incoming_type": "task_assignment", "response_length": 2308, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774195241.691045, "incoming_id": "f4849fbf51c8", "incoming_type": "review_result", "response_length": 872, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774195742.180866, "incoming_id": "41be183617a8", "incoming_type": "task_assignment", "response_length": 1356, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774195744.94793, "incoming_id": "b7ca4fdfa629", "incoming_type": "review_result", "response_length": 1503, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774196006.4887328, "incoming_id": "49756d36c502", "incoming_type": "task_assignment", "response_length": 1366, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774255820.858895, "incoming_id": "09d1c384cfb2", "incoming_type": "task_assignment", "response_length": 1678, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774255940.138871, "incoming_id": "6041ae686a2d", "incoming_type": "task_assignment", "response_length": 758, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774255999.727065, "incoming_id": "3985394694b2", "incoming_type": "review_result", "response_length": 1969, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774256233.19959, "incoming_id": "f471eadbfd14", "incoming_type": "task_assignment", "response_length": 935, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774256544.69487, "incoming_id": "5a41adb384d6", "incoming_type": "task_assignment", "response_length": 3028, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774256713.374123, "incoming_id": "950a97d11095", "incoming_type": "task_assignment", "response_length": 3985, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774256818.344358, "incoming_id": "3d385704d82c", "incoming_type": "review_result", "response_length": 1322, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774270858.647882, "incoming_id": "a0f06c929d79", "incoming_type": "task_assignment", "response_length": 2402, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774271020.68688, "incoming_id": "595dce63ca6a", "incoming_type": "review_result", "response_length": 1970, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774271234.419436, "incoming_id": "ebc7c86aa30b", "incoming_type": "review_result", "response_length": 1794, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774271451.961928, "incoming_id": "5aaf351e4128", "incoming_type": "review_result", "response_length": 1554, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774271633.195891, "incoming_id": "e4944803d806", "incoming_type": "task_assignment", "response_length": 1631, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774271806.347015, "incoming_id": "30ff73ba6b8c", "incoming_type": "review_result", "response_length": 1950, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774272003.563797, "incoming_id": "ea7faf3e5d1a", "incoming_type": "review_result", "response_length": 1143, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774277089.961632, "incoming_id": "6c2444f737c1", "incoming_type": "task_assignment", "response_length": 3618, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774277246.990168, "incoming_id": "16f86fd25f7b", "incoming_type": "review_result", "response_length": 1931, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774277404.18525, "incoming_id": "a1857080dfe5", "incoming_type": "task_assignment", "response_length": 850, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774277472.975719, "incoming_id": "bbfea3eb0125", "incoming_type": "review_result", "response_length": 899, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774277629.39485, "incoming_id": "b97fe7ae7de8", "incoming_type": "task_assignment", "response_length": 2405, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774278872.6797729, "incoming_id": "4a19362f1a95", "incoming_type": "task_assignment", "response_length": 2889, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774279712.342519, "incoming_id": "18ce6a344cea", "incoming_type": "task_assignment", "response_length": 3217, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774374475.162094, "incoming_id": "ddd1259f5fe4", "incoming_type": "task_assignment", "response_length": 4885, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774432237.645838, "incoming_id": "88a4986139d6", "incoming_type": "task_assignment", "response_length": 4500, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774432735.2014048, "incoming_id": "57030c86ed93", "incoming_type": "task_assignment", "response_length": 5641, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774433186.5361578, "incoming_id": "32f5ac33ffdc", "incoming_type": "task_assignment", "response_length": 4302, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774434130.19728, "incoming_id": "e6d6c3a25184", "incoming_type": "task_assignment", "response_length": 4079, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774434735.54516, "incoming_id": "f50872a2eb37", "incoming_type": "task_assignment", "response_length": 3991, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774435346.852083, "incoming_id": "3fb68fef07ec", "incoming_type": "review_result", "response_length": 8539, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774435587.618436, "incoming_id": "dcaddee937b3", "incoming_type": "task_assignment", "response_length": 8841, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774436504.7554188, "incoming_id": "5df17fdeb26c", "incoming_type": "task_assignment", "response_length": 4899, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774437533.3493602, "incoming_id": "0ad523d43556", "incoming_type": "task_assignment", "response_length": 5977, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774437829.8748422, "incoming_id": "12ac12dc9cd8", "incoming_type": "review_result", "response_length": 2892, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774438135.920079, "incoming_id": "d184c612b35e", "incoming_type": "task_assignment", "response_length": 2201, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774438411.64325, "incoming_id": "4b504ce5d930", "incoming_type": "review_result", "response_length": 2565, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774439043.451707, "incoming_id": "22f8d635ac75", "incoming_type": "task_assignment", "response_length": 4968, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774441485.721629, "incoming_id": "713f4c907ced", "incoming_type": "task_assignment", "response_length": 4322, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774441829.621891, "incoming_id": "3beb848e87fc", "incoming_type": "review_result", "response_length": 5434, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774442035.752197, "incoming_id": "a382105c2a17", "incoming_type": "task_assignment", "response_length": 1708, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774443020.2580118, "incoming_id": "6f2247e43b2f", "incoming_type": "task_assignment", "response_length": 4565, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774443863.0986502, "incoming_id": "07044f81bb71", "incoming_type": "task_assignment", "response_length": 5572, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774447404.922328, "incoming_id": "6c89030df25a", "incoming_type": "task_assignment", "response_length": 4788, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774447824.7377229, "incoming_id": "6c2dc9a27a14", "incoming_type": "review_result", "response_length": 6480, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774447920.327123, "incoming_id": "d48489d161f2", "incoming_type": "task_assignment", "response_length": 5858, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774448809.1969018, "incoming_id": "9ebcc1850fb5", "incoming_type": "task_assignment", "response_length": 9944, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774449417.9524522, "incoming_id": "6229052a1e20", "incoming_type": "task_assignment", "response_length": 4339, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774450287.660768, "incoming_id": "bd3176ac422a", "incoming_type": "task_assignment", "response_length": 4907, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774450527.411662, "incoming_id": "7dd89348ff01", "incoming_type": "task_assignment", "response_length": 2253, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774451893.506135, "incoming_id": "0750533286e1", "incoming_type": "task_assignment", "response_length": 3878, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774453076.858206, "incoming_id": "6229052a1e20", "incoming_type": "task_assignment", "response_length": 6214, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774453570.938661, "incoming_id": "b8ad40b08a21", "incoming_type": "task_assignment", "response_length": 4914, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774454020.303943, "incoming_id": "891942a589af", "incoming_type": "task_assignment", "response_length": 5214, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774463171.8463302, "incoming_id": "ebddfef87614", "incoming_type": "task_assignment", "response_length": 4213, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774463564.819951, "incoming_id": "f3f9b5b21792", "incoming_type": "review_result", "response_length": 2231, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774463585.1088052, "incoming_id": "fb43df5031e9", "incoming_type": "task_assignment", "response_length": 2246, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774464037.379955, "incoming_id": "1ad68afcfae4", "incoming_type": "task_assignment", "response_length": 2785, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774513230.7045708, "incoming_id": "8b08bd493307", "incoming_type": "task_assignment", "response_length": 1859, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774517091.369511, "incoming_id": "667ec1bd32c7", "incoming_type": "task_assignment", "response_length": 4950, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774517368.787891, "incoming_id": "fb39a622d318", "incoming_type": "task_assignment", "response_length": 3125, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774518933.081899, "incoming_id": "af3461b7eff3", "incoming_type": "review_result", "response_length": 576, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774519486.812886, "incoming_id": "14ae6a7f4e71", "incoming_type": "review_result", "response_length": 2159, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774519729.4668381, "incoming_id": "0cff98ccbfe4", "incoming_type": "review_result", "response_length": 2409, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774520143.623862, "incoming_id": "ae89f0fc62a9", "incoming_type": "review_result", "response_length": 4276, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774520808.732026, "incoming_id": "0bd888751d6f", "incoming_type": "review_result", "response_length": 4303, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774520957.03448, "incoming_id": "162bbe92dd6e", "incoming_type": "review_result", "response_length": 920, "outgoing_count": 1, "outgoing_types": ["task_progress"]}
+{"timestamp": 1774527975.6674829, "incoming_id": "ebddfef87614", "incoming_type": "task_assignment", "response_length": 4022, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774528689.464225, "incoming_id": "155dd5d51aaa", "incoming_type": "review_result", "response_length": 3762, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774528914.171548, "incoming_id": "dcb38962ea51", "incoming_type": "review_result", "response_length": 2106, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774534771.157839, "incoming_id": "7294d8a16318", "incoming_type": "task_assignment", "response_length": 5503, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774535341.780131, "incoming_id": "86cd67b4d29d", "incoming_type": "review_result", "response_length": 3150, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774535670.400394, "incoming_id": "d544588a9dd3", "incoming_type": "task_assignment", "response_length": 6903, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774536230.946007, "incoming_id": "e190fe6d665e", "incoming_type": "task_assignment", "response_length": 3420, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774536517.85451, "incoming_id": "b858eb7713e2", "incoming_type": "task_assignment", "response_length": 2886, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774536997.9102888, "incoming_id": "e5644dc8ff4a", "incoming_type": "review_result", "response_length": 3951, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774538450.939355, "incoming_id": "70288a3219a6", "incoming_type": "task_assignment", "response_length": 5383, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774541385.596704, "incoming_id": "4b761660fb53", "incoming_type": "task_assignment", "response_length": 4583, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
+{"timestamp": 1774541524.1188962, "incoming_id": "e67459c64482", "incoming_type": "review_result", "response_length": 3342, "outgoing_count": 2, "outgoing_types": ["task_progress", "review_request"]}
