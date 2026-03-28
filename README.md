@@ -16,9 +16,21 @@ The orchestrator includes a browser-based dashboard (`agent-orchestrator web`) f
 
 ![Work](agents/static/screenshots/work.png)
 
+### Thread detail — Full narrative, decisions, blocking issues, and proposal history
+
+![Thread Detail](agents/static/screenshots/thread-detail.png)
+
 ### System — Agent cards with pause/resume, pipeline with challengers
 
 ![System](agents/static/screenshots/system.png)
+
+### Telemetry — AI interaction timeline, metrics, and stream activity
+
+![Telemetry](agents/static/screenshots/telemetry.png)
+
+### Advanced — Redis state inspector for operator debugging
+
+![Advanced](agents/static/screenshots/advanced.png)
 
 ## Architecture
 
