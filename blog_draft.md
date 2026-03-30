@@ -2,13 +2,15 @@
 
 I've spent years building products and running engineering teams. The thing I keep coming back to is the gap between how teams are supposed to work and how they actually work: the handoffs that lose context, the PMs who optimize for volume instead of value, the dashboards that show activity but not progress. That gap is where most product work happens.
 
+I learn by doing. One of my goals this quarter was to build a real understanding of agentic AI, not just read about it. Last quarter I spent rebuilding my personal website using RAG. This quarter I wanted to go deeper: understand what happens when AI isn't a tool you use but a team you run.
+
 A few weeks ago I decided to stress-test everything I know about running teams by doing it with AI. Not asking an AI to help me. Building an actual team of AI agents, with roles and handoffs and safety controls, and running it the way I'd run a real engineering org. Building the infrastructure myself, defining the standards, operating the system live, and making judgment calls when things went sideways.
 
 I built a system that coordinates five AI agents: a Product Manager, a Product Designer, a Tech Lead, two Developers, and a Code Reviewer. Each one has a defined role, clear boundaries, and a structured way to pass work to the next. I pointed it at a real codebase and ran it for a week.
 
 By the end I had one fully autonomous pull request, 360 tests, a live dashboard, and a bunch of lessons I wasn't expecting. Not about AI. About leadership.
 
-Everyone talks about AI replacing jobs. Fewer people talk about what it feels like to actually work alongside AI day after day. The demos look great. The blog posts are optimistic. I wanted the ground truth.
+But I also had a second goal. As a product person, I wanted to form my own opinion on what AI actually means for the role, the craft, and the team. Everyone talks about AI PMs. Nobody agrees on what that means, and most of the conversation is theoretical. I wanted something concrete. So I decided to simulate being an AI-first product founder: build a product that simulates what the world looks like when you have an AI team instead of a human one, run it, and see what the experience actually teaches you about leadership.
 
 Not "can AI write code?" That's answered. But can AI agents coordinate? Can they specialize and hand off work without losing context? Can they produce something that survives review? And what does the human actually need to do to make any of this work?
 
@@ -57,6 +59,10 @@ This is something I've been advocating for on human teams for years: tighter han
 **The review loop was universal.** One proposal went through three review cycles. The Developer kept submitting code, the Reviewer kept catching the same bug: a subtle issue with library-specific exception types that the Developer just couldn't see. After three rounds, the system blocked the thread automatically. I've seen this exact dynamic on human teams. The system handled it the same way a good manager would: detect the loop, stop the cycle, surface the feedback for someone more senior.
 
 **Adding the Designer changed the pipeline's intelligence.** This was a later evolution. The original four-agent system (PM, Architect, Developer, Reviewer) treated every proposal the same way: straight to technical review. But user-facing work needs a different lens. Adding the Product Designer as a craft review stage between PM and Tech Lead meant that proposals about experience, trust, and usability got evaluated on those terms before anyone thought about implementation shape. The Tech Lead then received proposals with design context already attached, which made technical decisions better informed. It's the same reason real teams have designers review specs before engineering starts: the earlier you catch a UX problem, the cheaper it is to fix.
+
+At some point during the week I realized what I was actually doing. I wasn't just running an AI team. I was running a controlled experiment on management itself, stripped of all the human compensation that normally hides these dynamics. Human teams are forgiving enough to cover for fuzzy process. AI teams aren't. The PM drifts without priorities. Handoffs lose context without structure. Activity isn't progress without measurement. WIP limits matter even when the team never gets tired. Every principle I'd learned from managing real teams showed up, except now I could see it clearly because nothing was being smoothed over by human judgment and social norms. The AI team made my own leadership instincts visible to me in a way human teams never had.
+
+I built this system to understand what running an AI-first team actually requires. The answer turned out to be about leadership and self-knowledge more than technology.
 
 ---
 
