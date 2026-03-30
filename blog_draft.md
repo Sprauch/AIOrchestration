@@ -1,8 +1,8 @@
 # What running an AI team actually looks like
 
-I learn by doing. One of my goals this quarter was to build a real understanding of agentic AI, not just read about it. Last quarter I spent rebuilding my personal website using RAG. This quarter I wanted to go deeper: understand what happens when AI isn't a tool you use but a team you run.
+I learn by doing. One of my goals this quarter was to build a real understanding of agentic AI, not just read about it. Last quarter I spent rebuilding my personal website using RAG and gamifying my CV, the one before going deeper in understanding how Deep Learning work. This quarter I wanted to go deeper: understand what happens when AI isn't a tool you use but a team you run.
 
-As a product person, I wanted to form my own opinion on what AI actually means for the role, the craft, and the team. Everyone talks about AI PMs. Nobody agrees on what that means, and most of the conversation is theoretical. I wanted something concrete. So I decided to simulate being an AI-first product founder: build something that shows what the world looks like when you have an AI team instead of a human one, run it for real, and see what the experience teaches you.
+As a product person, I wanted to form my own opinion on what AI actually means for the role, the craft, and team dynamics. Everyone talks about AI is taking our jobs. Nobody agrees on what that means, and often the conversation turns into speculation. I wanted something concrete. So I decided to simulate the future as we imagine it today; build something that shows what the world looks like when you have an AI team instead of a human one, run it for real, and see what the experience teaches you.
 
 I also had a second goal. I wanted to stress-test everything I know about running teams by doing it with AI. Not asking an AI to help me. Can AI agents coordinate? Can they specialize and hand off work without losing context? Can they produce something that survives review? And what does the human actually need to do to make any of this work?
 
