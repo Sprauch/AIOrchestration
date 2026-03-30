@@ -23,6 +23,8 @@ The PM routes work based on what kind of proposal it is. User-facing work (produ
 
 They talk through a message pipeline. Each handoff is a typed contract, not a conversation. There's a safety layer that blocks dangerous actions and escalates risky ones for human approval. There's a dashboard so I can watch everything in real time.
 
+![The dashboard overview: outcome tiles, agent status, recent changes, and system health at a glance.](agents/static/screenshots/overview.png)
+
 ---
 
 ## The surprise: it felt exactly like managing a real team
@@ -44,6 +46,8 @@ Early on, the agents talked to each other in natural language. Paragraphs of rea
 I replaced the prose with minimal typed payloads. Title, priority, acceptance criteria. Decision, blocking issues, specific file and line comments. Less expressive, way more reliable. Most teams would call this "too much process." But we humans compensate for noise constantly without realizing it. Remove that ability and AI shows you exactly how much waste the noise creates.
 
 One proposal went through three review cycles. The Developer kept submitting code, the Reviewer kept catching the same bug: a subtle issue with library-specific exception types. After three rounds the system blocked the thread. I've seen this exact loop on human teams. The difference is the system caught it in hours, not sprints.
+
+![The Work view: every thread in the pipeline with its status, review decisions, and current stage.](agents/static/screenshots/work.png)
 
 At some point I realized what I was actually doing. Not just running an AI team. Running a controlled experiment on management, stripped of all the human compensation that normally hides these dynamics. Human teams are forgiving enough to cover for fuzzy process. AI teams aren't. The PM drifts without priorities. Handoffs lose context without structure. Activity isn't progress without measurement. WIP limits matter even when the team never gets tired. Every principle I'd learned from managing real teams showed up, except now I could see it clearly because nothing was being smoothed over by social norms.
 
@@ -75,6 +79,8 @@ Something most AI writing glosses over: this costs real money, and the waste is 
 
 It changed how I thought about flow. Don't start work the pipeline can't finish. Stop generating new proposals when existing ones haven't been reviewed. The gate has to come before the spend, not after.
 
+![Telemetry: AI interaction timeline showing Claude and Codex calls across agents, with token metrics.](agents/static/screenshots/telemetry.png)
+
 The agents created 24 branches during the week. Four were useful. 83% waste rate. Most people assume AI means efficiency. The reality was closer to high output, low yield. The system generates before it evaluates. Everything enters the pipeline. The pipeline does the filtering.
 
 Can AI do the work? Sure. The harder question is whether you can design a system where the work that gets done is the work that matters. That's not a technology problem.
@@ -102,6 +108,8 @@ I designed the backpressure model, the WIP gates, the thread guard, the message 
 I ran the system live. Diagnosed stalls from Redis state. Paused the PM when the pipeline was full. Abandoned threads that hit capability boundaries. Flushed stale data when restarting was cleaner than debugging.
 
 I defined what each role should care about. Wrote the PM's product brief. Decided the Designer should evaluate for experience quality and trust, not decoration. Decided what the dashboard should show and what to hide.
+
+![Thread detail: the full journey of a proposal, from narrative and blocking issues to proposal history and model transcript.](agents/static/screenshots/thread-detail.png)
 
 What prepared me for this wasn't any single skill. Years of product work taught me how to define priorities and evaluate whether work is aimed at the right problem. Engineering taught me how to build systems that are observable and debuggable. Running teams taught me when to step in and when to let things play out. This experiment pulled on all of it at once. I don't think you can do it well without the full stack.
 
