@@ -41,11 +41,11 @@ Left alone, the AI PM generated twelve proposals in its first run. Well-articula
 
 So I did what I'd do with any team. Wrote a one-page product brief. Three to five priorities. Explicit out-of-scope items. The effect was immediate. Proposals aligned. Approval rate went up. Work started flowing toward real value.
 
-What surprised me was how directly the playbook transferred. The AI PM responded to product leadership the same way a human PM does. Give it clear priorities and the output gets dramatically better. The skill wasn't AI-specific. It was the same instinct I've been developing my whole career, applied in a new context.
+What surprised me was how directly the playbook transferred. The AI PM responded to product leadership the same way a human PM does: give it clear priorities and the output gets dramatically better. The skill wasn't AI-specific. It was the same instinct I've been developing my whole career, applied in a new context.
 
-Early on, the agents talked to each other in natural language. Paragraphs of reasoning passed from one role to the next. Each stage interpreted the previous one and generated more text. By the time the Developer got a spec, it had been through multiple layers of translation. The telephone game that every organization knows, except here nobody could ask a clarifying question.
+Early on, the agents talked to each other in natural language. Paragraphs of reasoning passed from one role to the next. By the time the Developer got a spec, it had been through multiple layers of translation, the same telephone game every organization knows, except here nobody could ask a clarifying question.
 
-I replaced the prose with minimal typed payloads. Title, priority, acceptance criteria. Decision, blocking issues, specific file and line comments. Less expressive, way more reliable. Most teams would call this "too much process." But we humans compensate for noise constantly without realizing it. Remove that ability and AI shows you exactly how much waste the noise creates.
+I replaced that prose with minimal typed payloads. Title, priority, acceptance criteria. Decision, blocking issues, specific file and line comments. Less expressive, far more reliable. AI made the case for structured handoffs more clearly than any retrospective ever has.
 
 One proposal went through three review cycles. The Developer kept submitting code, the Reviewer kept catching the same bug: a subtle issue with library-specific exception types. After three rounds the system blocked the thread. I've seen this exact loop on human teams. The difference is the system caught it in hours, not sprints.
 
@@ -66,8 +66,6 @@ No informal context. No accumulated team culture. No "everyone knows the Tech Le
 On a human team, judgment is distributed. The PM has opinions. The tech lead pushes back. The developer raises concerns. Here, I was the only one who could tell whether the work mattered. When the PM drifted toward internal cleanup instead of user-facing improvements, nobody noticed but me. When a thread was stuck on a bug the Developer couldn't fix, no agent flagged it. They just kept trying.
 
 You're the only person in the room with judgment, and you're also the one who built the room. That combination is heavier than it sounds.
-
-It wore me out in ways I didn't anticipate.
 
 I abandoned a stuck thread instead of resetting it for a fourth attempt. Most people learn that "when to stop" skill by wasting weeks on something before admitting it won't work. Here I could see the pattern after three cycles. The system gave me the data to make the call fast. On a human team, the same thing plays out over two sprints before someone escalates.
 
@@ -101,23 +99,21 @@ I came out of this week frustrated that there's no good name for what I was doin
 
 "AI engineering" is too narrow the other way. The hardest problems weren't technical. They were about what the PM should optimize for, why the pipeline needed a Designer before the Tech Lead, when the system was doing useful work versus generating noise, and whether the dashboard was building trust or just showing data.
 
-The closest word I have is founder. Not because this is a startup. Because the role requires the same combination: you build the thing, you define the vision, you operate it, you make judgment calls with incomplete information, and you're the only one who can tell if it's working.
+The closest word I have is founder. Not because this is a startup. Because the role requires the same combination: you build the thing, you define the vision, you operate it, and you make judgment calls with incomplete information.
 
 During the week I wore four hats, and none of them came off.
 
-I pair-programmed the orchestrator, the dashboard, the safety layer, the test suite. 360 tests. Four dashboard redesigns. An auditor I built because I got tired of manually checking pipeline health. When I realized the team needed a Designer role, I wrote the prompt, built the agent, wired it into the pipeline, and updated the routing logic.
+I pair-programmed the orchestrator, the dashboard, the safety layer, and the test suite. 360 tests. Four dashboard redesigns. An auditor I built because I got tired of manually checking pipeline health. When I realized the team needed a Designer role, I wrote the prompt, built the agent, and wired it into the pipeline.
 
-I designed the backpressure model, the WIP gates, the thread guard, the message contracts between agents. I designed the pipeline topology: PM to Designer to Tech Lead to Developer to Reviewer, with smart routing that skips the Designer for purely technical work.
+I designed the backpressure model, the WIP gates, the thread guard, the message contracts, and the pipeline topology itself. PM to Designer to Tech Lead to Developer to Reviewer, with routing that skips the Designer for purely technical work.
 
-I ran the system live. Diagnosed stalls from Redis state. Paused the PM when the pipeline was full. Abandoned threads that hit capability boundaries. Flushed stale data when restarting was cleaner than debugging.
+I ran the system live. Diagnosed stalls from Redis state. Paused the PM when the pipeline was full. Abandoned threads that hit capability boundaries.
 
-I defined what each role should care about. Wrote the PM's product brief. Decided the Designer should evaluate for experience quality and trust, not decoration. Decided what the dashboard should show and what to hide.
+I defined what each role should care about. Wrote the PM's product brief. Decided the Designer should evaluate trust and experience quality, not decoration. Shaped what the dashboard should show and what to hide.
 
 ![AI agent thread detail showing proposal journey with blocking issues, review history, and model transcript](agents/static/screenshots/ai-agent-thread-detail-proposal.png)
 
-What prepared me for this wasn't any single skill. Years of product work taught me how to define priorities and evaluate whether work is aimed at the right problem. Engineering taught me how to build systems that are observable and debuggable. Running teams taught me when to step in and when to let things play out. This experiment pulled on all of it at once. I don't think you can do it well without the full stack.
-
-That's the bet I'm making on myself: that AI leadership is going to require people who can operate across all of these dimensions. People who can build the system, define the product, operate it live, and make the judgment calls that AI can't.
+What prepared me for this wasn't any single skill. Years of product work taught me how to define priorities and evaluate whether work is aimed at the right problem. Engineering taught me how to build systems that are observable and debuggable. Running teams taught me when to step in and when to let things play out. This experiment pulled on all of it at once.
 
 ---
 
@@ -143,7 +139,7 @@ One thing that struck me during the week was how much the experiment echoed idea
 
 Running an AI team didn't make me feel less needed. It made me feel needed in every direction at once. Builder, system designer, operator, product lead. All of them running in parallel, because the system needs all of them and there's only one human in the room.
 
-Some people will call that "AI PM." I don't think that's it. It's closer to founder, just with a different kind of team. You build the system, you define the standards, you operate it, you notice when things drift.
+Some people will call that "AI PM." I don't think that's quite right. It's closer to founder, just with a different kind of team.
 
 The learning compounds. Every frustration I had became a feature. Every failure became a principle I could articulate. Even when the system was broken, I was getting better at understanding how teams work and where my own instincts are strongest.
 
