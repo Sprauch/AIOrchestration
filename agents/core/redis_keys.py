@@ -25,7 +25,7 @@ async def _clear_active_work_thread(redis, thread_id: str) -> None:
     if not redis:
         return
     try:
-        for stage in ("proposals", "tasks", "reviews"):
+        for stage in ("designs", "proposals", "tasks", "reviews"):
             set_key, msg_key, ts_key = _active_keys(stage)
             await redis.srem(set_key, thread_id)
             await redis.hdel(msg_key, thread_id)
@@ -50,7 +50,7 @@ async def _active_work_count(redis, stage: str) -> int:
         return 0
     try:
         active = int(await redis.scard(f"orchestrator:active:{stage}"))
-        if stage == "proposals":
+        if stage in {"designs", "proposals"}:
             claim_key, _claim_ts = _claim_keys(stage)
             claimed = int(await redis.hlen(claim_key))
             return max(0, active - claimed)

@@ -204,7 +204,7 @@ async def _check_consumed_no_output(r: aioredis.Redis, findings: list[Finding]) 
     and pending == 0 — a concrete state, not a timing heuristic.
     """
     steps = [
-        ("proposals", "reviews", "Architect consumed proposals but produced no reviews"),
+        ("proposals", "reviews", "Tech lead consumed proposals but produced no reviews"),
         ("tasks", "review-requests", "Developer consumed tasks but produced no review requests"),
         ("review-requests", "review-results", "Reviewer consumed requests but produced no results"),
     ]

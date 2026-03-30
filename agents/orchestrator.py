@@ -29,23 +29,25 @@ from agents.core.redis_keys import (
 )
 from agents.core.safety import SafetyChecker, build_gate_context
 from agents.core.thread_guard import THREAD_CYCLES_KEY
-from agents.roles.architect_agent import ArchitectAgent, ArchitectDeliberatingAgent
 from agents.roles.developer_agent import DeveloperAgent
 from agents.roles.pm_agent import PMAgent, PMDeliberatingAgent
+from agents.roles.product_designer_agent import ProductDesignerAgent
 from agents.roles.reviewer_agent import ReviewerAgent
+from agents.roles.tech_lead_agent import TechLeadAgent, TechLeadDeliberatingAgent
 
 logger = logging.getLogger(__name__)
 
 ROLE_CLASSES: dict[str, type[AgentProcess]] = {
     "pm": PMAgent,
-    "architect": ArchitectAgent,
+    "product_designer": ProductDesignerAgent,
+    "tech_lead": TechLeadAgent,
     "developer": DeveloperAgent,
     "reviewer": ReviewerAgent,
 }
 
 ROLE_DELIBERATING_CLASSES: dict[str, type] = {
     "pm": PMDeliberatingAgent,
-    "architect": ArchitectDeliberatingAgent,
+    "tech_lead": TechLeadDeliberatingAgent,
 }
 
 
@@ -75,13 +77,13 @@ class Orchestrator:
     # Developers write to different branches concurrently.
     # Reviewers run git diff which can be confused by developer checkouts.
     _WORKTREE_ROLES = {"developer", "reviewer"}
-    _ACTIVE_WORK_STAGES = ("proposals", "tasks", "reviews")
+    _ACTIVE_WORK_STAGES = ("designs", "proposals", "tasks", "reviews")
 
     def _get_working_dir(self, role_name: str, agent_id: str, agent_cfg) -> str:
         """Get working directory for an agent.
 
         Developers and reviewers get isolated git worktrees to prevent
-        branch conflicts and dirty-read issues. PM and Architect share
+        branch conflicts and dirty-read issues. PM, Product Designer, and Tech Lead share
         the main directory (they only read in plan mode).
         """
         base_dir = self.config.system.working_dir
@@ -203,10 +205,23 @@ class Orchestrator:
         for env in ordered_events:
             tid = env.thread_id
             if env.message_type == MessageType.PROPOSAL:
-                set_key, msg_key, ts_key = _active_keys("proposals")
+                stage = "designs" if env.recipient_role == "product_designer" else "proposals"
+                set_key, msg_key, ts_key = _active_keys(stage)
                 await redis.sadd(set_key, tid)
                 await redis.hset(msg_key, tid, env.to_json())
                 await redis.hset(ts_key, tid, str(_timestamp_to_epoch(env.timestamp)))
+            elif env.message_type == MessageType.DESIGN_FEEDBACK:
+                design_set, design_msg, design_ts = _active_keys("designs")
+                design_claim_key, design_claim_ts = _claim_keys("designs")
+                proposal_set, proposal_msg, proposal_ts = _active_keys("proposals")
+                await redis.srem(design_set, tid)
+                await redis.hdel(design_msg, tid)
+                await redis.hdel(design_ts, tid)
+                await redis.hdel(design_claim_key, tid)
+                await redis.hdel(design_claim_ts, tid)
+                await redis.sadd(proposal_set, tid)
+                await redis.hset(proposal_msg, tid, env.to_json())
+                await redis.hset(proposal_ts, tid, str(_timestamp_to_epoch(env.timestamp)))
             elif env.message_type == MessageType.PROPOSAL_REVIEW:
                 set_key, msg_key, ts_key = _active_keys("proposals")
                 await redis.srem(set_key, tid)
@@ -336,7 +351,8 @@ class Orchestrator:
 
     PIPELINE_STAGES = [
         {"roles": ["pm"], "wait_for": None},
-        {"roles": ["architect"], "wait_for": "proposals"},
+        {"roles": ["product_designer"], "wait_for": "proposals"},
+        {"roles": ["tech_lead"], "wait_for": ["proposals", "design-feedback"]},
         {"roles": ["developer"], "wait_for": "tasks"},
         {"roles": ["reviewer"], "wait_for": "review-requests"},
     ]
@@ -385,8 +401,11 @@ class Orchestrator:
                 logger.info("Pipeline stage %d started: %s", idx + 1, stage["roles"])
                 continue
 
+            wait_streams = wait_stream if isinstance(wait_stream, list) else [wait_stream]
             try:
-                existing = await self.bus.redis.xlen(f"stream:{wait_stream}")
+                existing = 0
+                for stream_name in wait_streams:
+                    existing = max(existing, await self.bus.redis.xlen(f"stream:{stream_name}"))
             except Exception:
                 existing = 0
 
@@ -394,21 +413,26 @@ class Orchestrator:
                 for role in stage["roles"]:
                     self._spawn_role(role, agent_id_override)
                 logger.info(
-                    "Pipeline stage %d resumed: %s (stream:%s has %d messages)",
-                    idx + 1, stage["roles"], wait_stream, existing,
+                    "Pipeline stage %d resumed: %s (streams:%s have %d messages)",
+                    idx + 1, stage["roles"], ",".join(wait_streams), existing,
                 )
                 await asyncio.sleep(1)
                 continue
 
             logger.info(
-                "Pipeline stage %d (%s) waiting for stream:%s...",
-                idx + 1, stage["roles"], wait_stream,
+                "Pipeline stage %d (%s) waiting for streams:%s...",
+                idx + 1, stage["roles"], ",".join(wait_streams),
             )
 
             while self._running:
                 try:
-                    stream_len = await self.bus.redis.xlen(f"stream:{wait_stream}")
-                    if stream_len > 0:
+                    ready = False
+                    for stream_name in wait_streams:
+                        stream_len = await self.bus.redis.xlen(f"stream:{stream_name}")
+                        if stream_len > 0:
+                            ready = True
+                            break
+                    if ready:
                         break
                 except Exception:
                     pass
@@ -452,12 +476,12 @@ class Orchestrator:
         await self._cleanup_completed_branches()
 
         try:
-            existing_proposals = await self._active_work_count("proposals")
+            existing_proposals = await self._active_work_count("designs") + await self._active_work_count("proposals")
         except Exception:
             existing_proposals = 0
 
         if existing_proposals > 0:
-            logger.info("Resuming pipeline (%d unresolved proposals)", existing_proposals)
+            logger.info("Resuming pipeline (%d unresolved proposals/design items)", existing_proposals)
         else:
             logger.info("Starting fresh pipeline")
 
@@ -509,6 +533,7 @@ class Orchestrator:
             return
 
         steps = [
+            ("designs", "proposals", "design-feedback", "proposals consumed but no design feedback"),
             ("proposals", "proposals", "reviews", "proposals consumed but no reviews"),
             ("tasks", "tasks", "review-requests", "tasks consumed but no review requests"),
             ("reviews", "review-requests", "review-results", "review requests consumed but no results"),
@@ -599,12 +624,12 @@ class Orchestrator:
                     logger.exception("Failed to surface stalled pipeline for %s/%s", stage, thread_id[:8])
 
     async def _publish_startup_triggers(self) -> None:
-        # Per-stage check: only count unresolved proposals for PM trigger decision
-        proposals = await self._active_work_count("proposals")
+        # Per-stage check: count unresolved design + proposal backlog for PM trigger decision
+        proposals = await self._active_work_count("designs") + await self._active_work_count("proposals")
         max_proposals = self.config.system.max_pending_proposals
         if proposals >= max_proposals:
             logger.info(
-                "Skipping PM trigger: %d unresolved proposals (max %d)",
+                "Skipping PM trigger: %d unresolved proposals/design items (max %d)",
                 proposals, max_proposals,
             )
             return
@@ -927,7 +952,7 @@ class Orchestrator:
 
     async def _find_branch_for_thread(self, thread_id: str) -> str | None:
         try:
-            # Check Redis hash first (set by architect on task assignment)
+            # Check Redis hash first (set by tech lead on task assignment)
             branch = await self.bus.redis.hget("orchestrator:thread_branches", thread_id)
             if branch:
                 return branch

@@ -30,6 +30,18 @@ class Metrics:
         except Exception:
             logger.debug("Failed to increment metric %s", name, exc_info=True)
 
+    async def increment_many(self, increments: dict[str, int]) -> None:
+        """Increment multiple counters in a single pipelined round trip."""
+        if not increments:
+            return
+        try:
+            pipe = self._redis.pipeline()
+            for name, amount in increments.items():
+                pipe.hincrby(METRICS_KEY, name, amount)
+            await pipe.execute()
+        except Exception:
+            logger.debug("Failed to increment_many metrics", exc_info=True)
+
     async def get_all(self) -> dict[str, int]:
         """Read all metrics as a dict."""
         try:

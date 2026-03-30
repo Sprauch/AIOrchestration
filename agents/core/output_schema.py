@@ -66,8 +66,32 @@ PROPOSAL_PAYLOAD = {
 
 PROPOSAL_MESSAGE = deepcopy(MESSAGE_BASE)
 PROPOSAL_MESSAGE["properties"]["message_type"] = {"type": "string", "const": "proposal"}
-PROPOSAL_MESSAGE["properties"]["recipient_role"] = {"type": "string", "const": "architect"}
+PROPOSAL_MESSAGE["properties"]["recipient_role"] = {
+    "type": "string",
+    "enum": ["tech_lead", "product_designer"],
+}
 PROPOSAL_MESSAGE["properties"]["payload"] = PROPOSAL_PAYLOAD
+
+
+DESIGN_FEEDBACK_PAYLOAD = {
+    "type": "object",
+    "additionalProperties": False,
+    "properties": {
+        "summary": _str(200),
+        "user_experience_problem": _str(400),
+        "design_goal": _str(300),
+        "recommendations": _str_array(6, 250),
+        "priority": {"type": "integer", "minimum": 1, "maximum": 5},
+        "target_surfaces": _str_array(8, 120),
+        "success_signal": _str(200),
+    },
+    "required": ["summary", "user_experience_problem", "design_goal", "recommendations", "priority", "target_surfaces", "success_signal"],
+}
+
+DESIGN_FEEDBACK_MESSAGE = deepcopy(MESSAGE_BASE)
+DESIGN_FEEDBACK_MESSAGE["properties"]["message_type"] = {"type": "string", "const": "design_feedback"}
+DESIGN_FEEDBACK_MESSAGE["properties"]["recipient_role"] = {"type": "string", "const": "tech_lead"}
+DESIGN_FEEDBACK_MESSAGE["properties"]["payload"] = DESIGN_FEEDBACK_PAYLOAD
 
 
 PROPOSAL_REVIEW_PAYLOAD = {
@@ -224,7 +248,8 @@ def _schema_for_messages(messages: list[dict]) -> dict:
 
 ROLE_OUTPUT_SCHEMAS = {
     "pm": _schema_for_messages([PROPOSAL_MESSAGE]),
-    "architect": _schema_for_messages([PROPOSAL_REVIEW_MESSAGE, TASK_ASSIGNMENT_MESSAGE]),
+    "product_designer": _schema_for_messages([DESIGN_FEEDBACK_MESSAGE]),
+    "tech_lead": _schema_for_messages([PROPOSAL_REVIEW_MESSAGE, TASK_ASSIGNMENT_MESSAGE]),
     "developer": _schema_for_messages([TASK_PROGRESS_MESSAGE, REVIEW_REQUEST_MESSAGE]),
     "reviewer": _schema_for_messages([REVIEW_RESULT_MESSAGE]),
 }

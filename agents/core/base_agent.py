@@ -171,7 +171,12 @@ class AgentProcess(ABC):
             if not self._should_process(envelope):
                 continue
             claimed_stage = None
-            if self.role == "architect" and envelope.message_type == MessageType.PROPOSAL:
+            if self.role == "product_designer" and envelope.message_type == MessageType.PROPOSAL:
+                claimed = await self._claim_stage_work("designs", envelope.thread_id)
+                if not claimed:
+                    continue
+                claimed_stage = "designs"
+            elif self.role == "tech_lead" and envelope.message_type in (MessageType.PROPOSAL, MessageType.DESIGN_FEEDBACK):
                 claimed = await self._claim_stage_work("proposals", envelope.thread_id)
                 if not claimed:
                     continue
@@ -350,10 +355,23 @@ class AgentProcess(ABC):
         tid = envelope.thread_id
         try:
             if envelope.message_type == MessageType.PROPOSAL:
-                set_key, msg_key, ts_key = _active_keys("proposals")
+                stage = "designs" if envelope.recipient_role == "product_designer" else "proposals"
+                set_key, msg_key, ts_key = _active_keys(stage)
                 await self.bus.redis.sadd(set_key, tid)
                 await self.bus.redis.hset(msg_key, tid, envelope.to_json())
                 await self.bus.redis.hset(ts_key, tid, str(_timestamp_to_epoch(envelope.timestamp)))
+            elif envelope.message_type == MessageType.DESIGN_FEEDBACK:
+                design_set, design_msg, design_ts = _active_keys("designs")
+                design_claim_key, design_claim_ts = _claim_keys("designs")
+                proposal_set, proposal_msg, proposal_ts = _active_keys("proposals")
+                await self.bus.redis.srem(design_set, tid)
+                await self.bus.redis.hdel(design_msg, tid)
+                await self.bus.redis.hdel(design_ts, tid)
+                await self.bus.redis.hdel(design_claim_key, tid)
+                await self.bus.redis.hdel(design_claim_ts, tid)
+                await self.bus.redis.sadd(proposal_set, tid)
+                await self.bus.redis.hset(proposal_msg, tid, envelope.to_json())
+                await self.bus.redis.hset(proposal_ts, tid, str(_timestamp_to_epoch(envelope.timestamp)))
             elif envelope.message_type == MessageType.PROPOSAL_REVIEW:
                 set_key, msg_key, ts_key = _active_keys("proposals")
                 claim_key, claim_ts = _claim_keys("proposals")
@@ -395,24 +413,27 @@ class AgentProcess(ABC):
         """Per-stage backpressure. Returns True if this agent should back off.
 
         PM: gated by unresolved proposal backlog
-        Architect: NOT gated at message level (gated at publish time for tasks)
+        Tech Lead: NOT gated at message level (gated at publish time for tasks)
         Developer/Reviewer: never gated (they drain the pipeline)
         """
         if self.role == "pm":
             proposals = await self._active_work_count("proposals")
-            if proposals >= self.max_pending_proposals:
+            designs = await self._active_work_count("designs")
+            backlog = proposals + designs
+            if backlog >= self.max_pending_proposals:
                 # Allow revisions for threads already tracked in the active set.
                 if envelope and envelope.message_type == MessageType.PROPOSAL_REVIEW and self.bus.redis:
                     try:
-                        if await self.bus.redis.sismember(
-                            "orchestrator:active:proposals", envelope.thread_id,
+                        if (
+                            await self.bus.redis.sismember("orchestrator:active:proposals", envelope.thread_id)
+                            or await self.bus.redis.sismember("orchestrator:active:designs", envelope.thread_id)
                         ):
                             return False
                     except Exception:
                         pass
                 logger.debug(
-                    "Agent %s: active proposal backlog at capacity (%d >= %d), backing off",
-                    self.agent_id, proposals, self.max_pending_proposals,
+                    "Agent %s: active proposal/design backlog at capacity (%d >= %d), backing off",
+                    self.agent_id, backlog, self.max_pending_proposals,
                 )
                 return True
         return False
@@ -476,8 +497,9 @@ class AgentProcess(ABC):
             for out_env in outgoing:
                 try:
                     if out_env.message_type == MessageType.PROPOSAL:
-                        if await self._active_work_count("proposals") >= self.max_pending_proposals:
-                            logger.info("Agent %s: active proposal backlog full, holding remaining", self.agent_id)
+                        proposal_backlog = await self._active_work_count("designs") + await self._active_work_count("proposals")
+                        if proposal_backlog >= self.max_pending_proposals:
+                            logger.info("Agent %s: active proposal/design backlog full, holding remaining", self.agent_id)
                             break
                     elif out_env.message_type == MessageType.TASK_ASSIGNMENT:
                         tasks_full = await self._active_work_count("tasks") >= self.max_pending_tasks
@@ -487,7 +509,7 @@ class AgentProcess(ABC):
                             logger.info("Agent %s: %s, holding task assignment", self.agent_id, reason)
                             break
                     # No REVIEW_REQUEST gate — developer always publishes review requests.
-                    # Review backpressure slows upstream (PM triggers + architect tasks) instead.
+                    # Review backpressure slows upstream (PM triggers + tech lead tasks) instead.
                 except Exception:
                     pass
 
@@ -788,6 +810,7 @@ class AgentProcess(ABC):
         """Determine which channel an outgoing envelope should go to."""
         type_to_channel = {
             MessageType.PROPOSAL: "proposals",
+            MessageType.DESIGN_FEEDBACK: "design-feedback",
             MessageType.PROPOSAL_REVIEW: "reviews",
             MessageType.TASK_ASSIGNMENT: "tasks",
             MessageType.TASK_PROGRESS: "progress",

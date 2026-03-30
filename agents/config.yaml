@@ -10,9 +10,9 @@ system:
   cascade_poll_interval: 2
   restart_delay: 5
   gate_timeout: 300
-  max_pending_proposals: 3  # PM pauses when this many proposals await architect
-  max_pending_tasks: 3      # Architect holds approvals when this many tasks await developer
-  max_pending_reviews: 5    # Slows upstream (PM triggers + architect tasks) when reviews back up
+  max_pending_proposals: 3  # PM pauses when this many proposals await technical review
+  max_pending_tasks: 3      # Tech Lead holds approvals when this many tasks await developer
+  max_pending_reviews: 5    # Slows upstream (PM triggers + tech lead tasks) when reviews back up
 
 agents:
   pm:
@@ -31,13 +31,22 @@ agents:
       reasoning_effort: medium
       rounds: 2
 
-  architect:
+  product_designer:
     count: 1
     cli: claude
     model: sonnet
     permission_mode: plan
-    system_prompt: agents/prompts/architect.md
+    system_prompt: agents/prompts/product_designer.md
     subscribes_to: [proposals]
+    publishes_to: [design-feedback, cli-traces]
+
+  tech_lead:
+    count: 1
+    cli: claude
+    model: sonnet
+    permission_mode: plan
+    system_prompt: agents/prompts/tech_lead.md
+    subscribes_to: [proposals, design-feedback]
     publishes_to: [reviews, tasks, cli-traces]
     deliberation:
       cli: codex

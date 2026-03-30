@@ -149,11 +149,12 @@ async def _query_snapshot(r: aioredis.Redis) -> SystemSnapshot:
 # ── Pipeline phase derivation ─────────────────────────────
 
 # Fixed pipeline phases in execution order.
-PIPELINE_PHASES = ["pm", "architect", "developer", "reviewer"]
+PIPELINE_PHASES = ["pm", "product_designer", "tech_lead", "developer", "reviewer"]
 
 PHASE_LABELS = {
     "pm": "PM proposing",
-    "architect": "Architect reviewing",
+    "product_designer": "Product Designer reviewing",
+    "tech_lead": "Tech Lead reviewing",
     "developer": "Developer implementing",
     "reviewer": "Reviewer reviewing",
 }
@@ -174,7 +175,7 @@ def derive_current_phase(
     active_roles: set[str] = set()
 
     # Map short-form prefixes to canonical role names
-    _short_to_role = {"arch": "architect", "dev": "developer", "rev": "reviewer"}
+    _short_to_role = {"arch": "tech_lead", "tl": "tech_lead", "pd": "product_designer", "dev": "developer", "rev": "reviewer"}
 
     for agent in agents:
         prefix = agent.agent_id.split("-")[0]  # "pm-1" -> "pm", "dev-1" -> "dev"
@@ -183,8 +184,8 @@ def derive_current_phase(
             active_roles.add(r)
 
     # Backpressure stages map to roles that consume from those queues:
-    # proposals -> architect, tasks -> developer, reviews -> reviewer
-    _bp_to_role = {"proposals": "architect", "tasks": "developer", "reviews": "reviewer"}
+    # designs -> product designer, proposals -> tech lead, tasks -> developer, reviews -> reviewer
+    _bp_to_role = {"designs": "product_designer", "proposals": "tech_lead", "tasks": "developer", "reviews": "reviewer"}
     if backpressure:
         for stage, info in backpressure.items():
             if isinstance(info, dict) and info.get("active", 0) > 0:

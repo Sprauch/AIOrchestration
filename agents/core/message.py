@@ -24,6 +24,7 @@ class MessageType(str, Enum):
     SYSTEM = "system"
     PROPOSAL = "proposal"
     CODEBASE_ANALYSIS = "codebase_analysis"
+    DESIGN_FEEDBACK = "design_feedback"
     PROPOSAL_REVIEW = "proposal_review"
     TASK_ASSIGNMENT = "task_assignment"
     TASK_PROGRESS = "task_progress"

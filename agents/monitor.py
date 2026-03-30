@@ -41,12 +41,12 @@ from agents.core.state import load_snapshot_from_connection
 # ── Styles ──────────────────────────────────────────────────
 
 ROLE_ICONS = {
-    "pm": "PM", "architect": "ARCH", "developer": "DEV",
+    "pm": "PM", "product_designer": "PD", "tech_lead": "TL", "developer": "DEV",
     "reviewer": "REV", "system": "SYS", "human": "HMN",
     "challenger": "CHAL",
 }
 ROLE_COLORS = {
-    "pm": "blue", "architect": "yellow", "developer": "green",
+    "pm": "blue", "product_designer": "cyan", "tech_lead": "yellow", "developer": "green",
     "reviewer": "magenta", "system": "white", "human": "cyan",
     "challenger": "red",
 }
@@ -69,12 +69,13 @@ DECISION_DISPLAY = {
 }
 
 ALL_CHANNELS = [
-    "proposals", "reviews", "tasks", "review-requests",
+    "proposals", "design-feedback", "reviews", "tasks", "review-requests",
     "review-results", "progress", "human-gates", "cli-traces", "system",
 ]
 
 CHANNEL_FOR_TYPE = {
     "proposal": "proposals", "codebase_analysis": "proposals",
+    "design_feedback": "design-feedback",
     "proposal_review": "reviews", "task_assignment": "tasks",
     "task_progress": "progress", "review_request": "review-requests",
     "review_result": "review-results", "cli_trace": "cli-traces",
@@ -988,7 +989,8 @@ class MonitorApp(App):
         stage_labels = {
             MessageType.SYSTEM: "TRIGGER",
             MessageType.PROPOSAL: "PROPOSAL",
-            MessageType.PROPOSAL_REVIEW: "ARCHITECT",
+            MessageType.DESIGN_FEEDBACK: "DESIGN",
+            MessageType.PROPOSAL_REVIEW: "TECH LEAD",
             MessageType.TASK_ASSIGNMENT: "TASK",
             MessageType.TASK_PROGRESS: "PROGRESS",
             MessageType.REVIEW_REQUEST: "REVIEW REQ",
@@ -1303,7 +1305,7 @@ class MonitorApp(App):
         # Throughput
         lines.append("Throughput")
         lines.append(_row("Total messages", "messages:total"))
-        for role in ("pm", "architect", "developer", "reviewer"):
+        for role in ("pm", "product_designer", "tech_lead", "developer", "reviewer"):
             if _val(f"messages:{role}") > 0:
                 lines.append(_row(f"  {role}", f"messages:{role}"))
         lines.append("")
@@ -1311,7 +1313,7 @@ class MonitorApp(App):
         # Failures
         lines.append("Failures")
         lines.append(_row("Total errors", "errors:total"))
-        for role in ("pm", "architect", "developer", "reviewer"):
+        for role in ("pm", "product_designer", "tech_lead", "developer", "reviewer"):
             if _val(f"errors:{role}") > 0:
                 lines.append(_row(f"  {role}", f"errors:{role}"))
         lines.append("")

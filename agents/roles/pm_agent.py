@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class PMAgent(AgentProcess):
+    USER_FACING_TARGETS = {"product", "ux", "trust", "onboarding", "workflow", "adoption", "feature"}
 
     def default_channels(self) -> dict:
         return {
@@ -41,7 +42,7 @@ class PMAgent(AgentProcess):
             if decision in ("needs_revision", "needs_clarification", "rejected"):
                 concerns = envelope.payload.get("concerns", [])[:5]
                 return (
-                    f"The architect requested revisions.\n"
+                    f"The tech lead requested revisions.\n"
                     f"Decision: {decision}\n"
                     f"Concerns:\n"
                     + "\n".join(f"  - {str(c)[:300]}" for c in concerns)
@@ -64,14 +65,19 @@ class PMAgent(AgentProcess):
             description = p.get("user_problem") or p.get("description", "")
             clean = {
                 "title": str(p.get("title", ""))[:100],
+                "target_area": str(p.get("target_area", p.get("category", "")))[:40],
+                "user_problem": str(p.get("user_problem", ""))[:400],
                 "description": str(description)[:400],
                 "proposed_change": str(p.get("proposed_change", ""))[:300],
                 "rationale": str(p.get("rationale", ""))[:300],
+                "expected_user_outcome": str(p.get("expected_user_outcome", ""))[:300],
+                "success_signal": str(p.get("success_signal", ""))[:200],
                 "priority": p.get("priority", 3),
                 "affected_files": p.get("affected_files", [])[:10],
                 "estimated_effort": str(p.get("estimated_effort", "medium"))[:20],
                 "category": str(p.get("category", "quality"))[:30],
             }
+            recipient_role = "product_designer" if clean["target_area"] in self.USER_FACING_TARGETS else "tech_lead"
             # Thread ID resolution:
             # 1. If the agent's output specifies thread_id, use it
             # 2. If this is a revision (architect feedback), preserve source thread
@@ -85,7 +91,7 @@ class PMAgent(AgentProcess):
                 sender_role=self.role,
                 message_type=MessageType.PROPOSAL,
                 payload=clean,
-                recipient_role="architect",
+                recipient_role=recipient_role,
             )
             if tid:
                 kwargs["thread_id"] = tid

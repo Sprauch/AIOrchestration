@@ -30,13 +30,13 @@ logger = logging.getLogger(__name__)
 STATIC_DIR = Path(__file__).parent / "static"
 
 ALL_CHANNELS = [
-    "proposals", "reviews", "tasks", "review-requests",
+    "proposals", "design-feedback", "reviews", "tasks", "review-requests",
     "review-results", "progress", "human-gates", "system",
 ]
 
 
 class WebDashboard:
-    _ACTIVE_WORK_STAGES = ("proposals", "tasks", "reviews")
+    _ACTIVE_WORK_STAGES = ("designs", "proposals", "tasks", "reviews")
 
     def __init__(self, redis_url: str, port: int = 8081, gate_token: str | None = None,
                  idle_threshold: int = 600, max_change_rounds: int = 3, stream_read_limit: int = 500,
@@ -48,6 +48,7 @@ class WebDashboard:
         self._max_change_rounds = max_change_rounds
         self._stream_read_limit = stream_read_limit
         self._wip_limits = {
+            "designs": max_pending_proposals,
             "proposals": max_pending_proposals,
             "tasks": max_pending_tasks,
             "reviews": max_pending_reviews,
@@ -210,7 +211,7 @@ class WebDashboard:
                 timestamp = parts[1] if len(parts) > 1 else ""
                 detail = parts[2] if len(parts) > 2 else ""
 
-                # Look up branch name from cached hash (set by architect on task publish)
+                # Look up branch name from cached hash (set by tech lead on task publish)
                 branch = ""
                 try:
                     branch = await r.hget("orchestrator:thread_branches", thread_id) or ""
@@ -646,7 +647,7 @@ class WebDashboard:
 
             summary_bits = [f"{t['proposal_submissions']} PM submission" + ("" if t["proposal_submissions"] == 1 else "s")]
             if t["proposal_approvals"]:
-                summary_bits.append(f"{t['proposal_approvals']} architect-approved")
+                summary_bits.append(f"{t['proposal_approvals']} tech-lead-approved")
             if t["proposal_rejections"]:
                 summary_bits.append(f"{t['proposal_rejections']} rejected")
             if t["proposal_revisions"]:
@@ -687,7 +688,7 @@ class WebDashboard:
                 t["blocked_reason"] = t["concerns"][0] if t["concerns"] else ""
                 t["needs_human"] = False
             elif status == "failed":
-                t["why"] = "Rejected by architect"
+                t["why"] = "Rejected by tech lead"
                 t["blocked_reason"] = ""
                 t["needs_human"] = False
             elif t["pr"] and t["pr"].get("status") == "failed":
@@ -702,15 +703,15 @@ class WebDashboard:
             # Current state — human readable
             state_map = {
                 "analyzing": "Being analyzed by PM",
-                "proposed": "Proposal submitted, awaiting architect",
-                "approved": "Architect approved, awaiting developer",
-                "revision_requested": "PM revising based on architect feedback",
+                "proposed": "Proposal submitted, awaiting technical review",
+                "approved": "Tech Lead approved, awaiting developer",
+                "revision_requested": "PM revising based on tech lead feedback",
                 "implementing": "Developer implementing on " + (t["branch"] or "agent branch"),
                 "awaiting_review": "Implementation complete, awaiting reviewer",
                 "in_review": "Under code review",
                 "rework": "Developer reworking after reviewer feedback",
                 "completed": "Approved and done",
-                "rejected": "Rejected by architect",
+                "rejected": "Rejected by tech lead",
                 "cycle_exhausted": f"Blocked after {t['review_cycles']} review cycles",
                 "abandoned": "Abandoned by operator",
             }
@@ -719,7 +720,7 @@ class WebDashboard:
             # Next step
             next_map = {
                 "analyzing": "PM will produce structured proposals",
-                "proposed": "Architect will review for feasibility and risk",
+                "proposed": "Tech Lead will review for feasibility and risk",
                 "approved": "Developer will be assigned to implement",
                 "revision_requested": "PM will revise and resubmit",
                 "implementing": "Developer will submit for code review when done",
@@ -756,7 +757,7 @@ class WebDashboard:
                 if t["last_decision"] == "approved":
                     latest_change = {
                         "kind": "approved",
-                        "summary": "Architect approved the proposal",
+                        "summary": "Tech Lead approved the proposal",
                         "detail": "This thread moved into implementation.",
                         "time": t["last_time"],
                         "timestamp": t["last_timestamp"],
@@ -764,7 +765,7 @@ class WebDashboard:
                 elif t["last_decision"] in ("needs_revision", "needs_clarification"):
                     latest_change = {
                         "kind": "sent_back",
-                        "summary": "Architect sent this back to PM",
+                        "summary": "Tech Lead sent this back to PM",
                         "detail": "PM needs to revise and resubmit the proposal.",
                         "time": t["last_time"],
                         "timestamp": t["last_timestamp"],
@@ -772,7 +773,7 @@ class WebDashboard:
                 elif t["last_decision"] == "rejected":
                     latest_change = {
                         "kind": "rejected",
-                        "summary": "Architect rejected the proposal",
+                        "summary": "Tech Lead rejected the proposal",
                         "detail": "This thread will not continue unless resubmitted.",
                         "time": t["last_time"],
                         "timestamp": t["last_timestamp"],
@@ -781,7 +782,7 @@ class WebDashboard:
                 latest_change = {
                     "kind": "proposal",
                     "summary": "PM submitted a proposal",
-                    "detail": "Architect review is next.",
+                    "detail": "Tech Lead review is next.",
                     "time": t["last_time"],
                     "timestamp": t["last_timestamp"],
                 }
