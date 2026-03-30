@@ -1,14 +1,16 @@
 # What running an AI team actually looks like
 
-I learn by doing. One of my goals this quarter was to build a real understanding of agentic AI, not just read about it. Last quarter I spent rebuilding my personal website using RAG and gamifying my CV, the one before going deeper in understanding how Deep Learning work. This quarter I wanted to go deeper: understand what happens when AI isn't a tool you use but a team you run.
+*I built a multi-agent AI team with five LLM agents and ran it for a week. Here's what I learned about AI leadership, team dynamics, and what the human actually needs to do.*
+
+I learn by doing. One of my goals this quarter was to build a real understanding of agentic AI, not just read about it. Last quarter I spent rebuilding [my personal website](https://alimyftiu.com) using RAG and gamifying my CV, the one before going deeper in understanding how Deep Learning work. This quarter I wanted to go deeper: understand what happens when AI isn't a tool you use but a team you run.
 
 As a product person, I wanted to form my own opinion on what AI actually means for the role, the craft, and team dynamics. Everyone talks about AI is taking our jobs. Nobody agrees on what that means, and often the conversation turns into speculation. I wanted something concrete. So I decided to simulate the future as we imagine it today; build something that shows what the world looks like when you have an AI team instead of a human one, run it for real, and see what the experience teaches you.
 
 I also had a second goal. I wanted to stress-test everything I know about running teams by doing it with AI. Not asking an AI to help me. Can AI agents coordinate? Can they specialize and hand off work without losing context? Can they produce something that survives review? And what does the human actually need to do to make any of this work?
 
-I built a system that coordinates five AI agents: a Product Manager, a Product Designer, a Tech Lead, two Developers, and a Code Reviewer.
+I built a multi-agent system that coordinates five LLM agents, each running as a long-lived Claude Code or Codex CLI session: a Product Manager, a Product Designer, a Tech Lead, two Developers, and a Code Reviewer.
 
-Plenty of people are building systems like this. I wanted to build my own, because that's how I've always learned fastest. Not studying from the outside, but operating inside the thing and seeing what breaks.
+Plenty of people are building agentic AI systems like this. I wanted to build my own, because that's how I've always learned fastest. Not studying from the outside, but operating inside the thing and seeing what breaks.
 
 The team works like this:
 
@@ -23,7 +25,7 @@ The PM routes work based on what kind of proposal it is. User-facing work (produ
 
 They talk through a message pipeline. Each handoff is a typed contract, not a conversation. There's a safety layer that blocks dangerous actions and escalates risky ones for human approval. There's a dashboard so I can watch everything in real time.
 
-![The dashboard overview: outcome tiles, agent status, recent changes, and system health at a glance.](agents/static/screenshots/overview.png)
+![AI agent dashboard overview showing outcome tiles, agent status, recent workflow changes, and system health](agents/static/screenshots/ai-agent-dashboard-overview.png)
 
 ---
 
@@ -47,7 +49,7 @@ I replaced the prose with minimal typed payloads. Title, priority, acceptance cr
 
 One proposal went through three review cycles. The Developer kept submitting code, the Reviewer kept catching the same bug: a subtle issue with library-specific exception types. After three rounds the system blocked the thread. I've seen this exact loop on human teams. The difference is the system caught it in hours, not sprints.
 
-![The Work view: every thread in the pipeline with its status, review decisions, and current stage.](agents/static/screenshots/work.png)
+![AI agent pipeline work view showing threads with status badges, review decisions, and rework loops](agents/static/screenshots/ai-agent-pipeline-work-threads.png)
 
 At some point I realized what I was actually doing. Not just running an AI team. Running a controlled experiment on management, stripped of all the human compensation that normally hides these dynamics. Human teams are forgiving enough to cover for fuzzy process. AI teams aren't. The PM drifts without priorities. Handoffs lose context without structure. Activity isn't progress without measurement. WIP limits matter even when the team never gets tired. Every principle I'd learned from managing real teams showed up, except now I could see it clearly because nothing was being smoothed over by social norms.
 
@@ -77,15 +79,17 @@ Other days I paused the PM because the pipeline was full. Other times I flushed 
 
 Something most AI writing glosses over: this costs real money, and the waste is visible. Every proposal costs tokens. Every review costs tokens. Every rejected implementation costs tokens. When the PM generated twelve proposals and ten got rejected, those ten still showed up on the bill. When the Developer failed the same code review three times, each attempt cost money, and the third produced the same wrong answer as the first.
 
-It changed how I thought about flow. Don't start work the pipeline can't finish. Stop generating new proposals when existing ones haven't been reviewed. The gate has to come before the spend, not after.
+It changed how I thought about the AI workflow economics. Don't start work the pipeline can't finish. Stop generating new proposals when existing ones haven't been reviewed. The gate has to come before the spend, not after.
 
-![Telemetry: AI interaction timeline showing Claude and Codex calls across agents, with token metrics.](agents/static/screenshots/telemetry.png)
+![AI agent telemetry showing Claude and Codex LLM calls across agents with token usage and cost metrics](agents/static/screenshots/ai-agent-telemetry-token-usage.png)
+
+Here are the actual numbers from one week of running an AI agent team:
 
 The agents created 24 branches during the week. Four were useful. 83% waste rate. Most people assume AI means efficiency. The reality was closer to high output, low yield. The system generates before it evaluates. Everything enters the pipeline. The pipeline does the filtering.
 
 Can AI do the work? Sure. The harder question is whether you can design a system where the work that gets done is the work that matters. That's not a technology problem.
 
-One pull request made it all the way through. The system found the opportunity, checked feasibility, wrote the code, reviewed it, and shipped it. No human wrote a line. The human just defined what mattered.
+One pull request made it all the way through, fully autonomous. The system found the opportunity, checked feasibility, wrote the code, reviewed it, and shipped it. No human wrote a line. The human just defined what mattered.
 
 ---
 
@@ -93,9 +97,9 @@ One pull request made it all the way through. The system found the opportunity, 
 
 I came out of this week frustrated that there's no good name for what I was doing.
 
-"AI PM" is too narrow. I wasn't just defining requirements. I was building the infrastructure, designing the architecture, operating the system, debugging production issues, and making product judgment calls. All at once.
+"AI product management" doesn't cover it. I wasn't just defining requirements. I was building the infrastructure, designing the architecture, operating the system, debugging production issues, and making product judgment calls. All at once.
 
-"AI engineer" is too narrow the other way. The hardest problems weren't technical. They were about what the PM should optimize for, why the pipeline needed a Designer before the Tech Lead, when the system was doing useful work versus generating noise, and whether the dashboard was building trust or just showing data.
+"AI engineering" is too narrow the other way. The hardest problems weren't technical. They were about what the PM should optimize for, why the pipeline needed a Designer before the Tech Lead, when the system was doing useful work versus generating noise, and whether the dashboard was building trust or just showing data.
 
 The closest word I have is founder. Not because this is a startup. Because the role requires the same combination: you build the thing, you define the vision, you operate it, you make judgment calls with incomplete information, and you're the only one who can tell if it's working.
 
@@ -109,11 +113,11 @@ I ran the system live. Diagnosed stalls from Redis state. Paused the PM when the
 
 I defined what each role should care about. Wrote the PM's product brief. Decided the Designer should evaluate for experience quality and trust, not decoration. Decided what the dashboard should show and what to hide.
 
-![Thread detail: the full journey of a proposal, from narrative and blocking issues to proposal history and model transcript.](agents/static/screenshots/thread-detail.png)
+![AI agent thread detail showing proposal journey with blocking issues, review history, and model transcript](agents/static/screenshots/ai-agent-thread-detail-proposal.png)
 
 What prepared me for this wasn't any single skill. Years of product work taught me how to define priorities and evaluate whether work is aimed at the right problem. Engineering taught me how to build systems that are observable and debuggable. Running teams taught me when to step in and when to let things play out. This experiment pulled on all of it at once. I don't think you can do it well without the full stack.
 
-That's the bet I'm making on myself: that the people who matter most in AI-first work will be the ones who can operate across all of these dimensions. People who can build the system, define the product, operate it live, and make the judgment calls that AI can't.
+That's the bet I'm making on myself: that AI leadership is going to require people who can operate across all of these dimensions. People who can build the system, define the product, operate it live, and make the judgment calls that AI can't.
 
 ---
 
@@ -147,4 +151,4 @@ I don't think AI replaces the human in the loop. I think it raises the bar for w
 
 ---
 
-*I'm a product lover and builder exploring what AI-first teams actually require. I built [Agent Orchestrator](https://github.com/ali-myftiu/agent-orchestrator) in a week: architecture, code, dashboard, safety layer, tests, with AI as my pair programmer. Five AI agents (PM, Product Designer, Tech Lead, Developer, Reviewer) working as a structured engineering team on real codebases. Open source if you want to try it. I'm always up for talking to people thinking about the intersection of AI, product, and team design: [LinkedIn](https://linkedin.com/in/alimyftiu).*
+*I'm a product lover and builder exploring what AI-first teams actually require. I built [Agent Orchestrator](https://github.com/ali-myftiu/agent-orchestrator) in a week: a multi-agent system where five LLM agents (PM, Product Designer, Tech Lead, Developer, Reviewer) work as an autonomous engineering team on real codebases. Built with Claude Code and Codex, open source if you want to try it. I'm always up for talking to people thinking about the intersection of AI, product, and team design: [LinkedIn](https://linkedin.com/in/alimyftiu).*
