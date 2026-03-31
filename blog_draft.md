@@ -4,7 +4,7 @@
 
 Everyone talks about AI taking our jobs. The conversation rarely gets further than that. No one agrees on what it actually means, and most discussions collapse into speculation before they reach anything useful.
 
-My last two quarters went into adjacent experiments, rebuilding [my personal website](https://alimyftiu.com) using RAG, gamifying my CV. This quarter I wanted to go further: understand what agentic AI actually looks like when it's doing work, not just assisting with it.
+My last two quarters went into adjacent experiments: rebuilding [my personal website](https://alimyftiu.com) using RAG, gamifying my CV. This quarter I wanted to go further. Understand what agentic AI actually looks like when it's doing work, not just assisting with it.
 
 I decided to simulate the future as people currently imagine it. To take a real product workflow with real roles, real handoffs, real deliverables, and replace humans with agents. Not AI tools that help a human team. An AI team, run like a human one.
 
@@ -12,15 +12,15 @@ This opened up questions I didn't expect to care about as much as I did. How do 
 
 I built a multi-agent system that coordinates five LLM agents, each running as a long-lived Claude Code or Codex CLI session: a Product Manager, a Product Designer, a Tech Lead, two Developers, and a Code Reviewer.
 
-The system is the experiment. What I wanted to understand isn't whether a single model can write code or review a pull request. That's solved. The harder question is what happens when you give multiple agents distinct roles and ask them to collaborate through a structured workflow. Does the coordination hold? Do the handoffs lose meaning the way they do on human teams? Does the pipeline produce real output, or just plausible activity?
+The system is the experiment. Whether a single model can write code is solved. The harder question is what happens when you give multiple agents distinct roles and ask them to collaborate through a structured workflow. Does the coordination hold? Do the handoffs lose meaning the way they do on human teams? Does the pipeline produce real output, or just plausible activity?
 
-The orchestration layer turns out to matter more than any individual agent. A capable model in a bad workflow produces waste. An average model in a well-designed pipeline produces value. How agents communicate, how work flows between stages, what gets blocked and what gets escalated, that's what determines whether anything useful comes out the other end.
+The orchestration layer matters more than any individual agent. A capable model in a bad workflow produces waste. An average model in a well-designed pipeline produces value. How agents communicate, how work flows between stages, what gets blocked and what gets escalated, that's what determines whether anything useful comes out the other end.
 
 Plenty of people are building agentic AI systems like this. I wanted to build my own, because that's how I've always learned fastest. Not studying from the outside, but operating inside the thing and seeing what breaks.
 
 The team works like this:
 
-- The PM reads a templated doc with high level requirements, analyzes the codebase, and proposes improvements framed around user need
+- The PM reads a templated doc with high-level requirements, analyzes the codebase, and proposes improvements framed around user need
 - The Product Designer reviews user-facing proposals for experience quality, clarity, and trust
 - The Tech Lead reviews proposals (with design feedback attached) for technical feasibility, shapes the implementation, and assigns tasks
 - The Developers implement approved specs on isolated branches
@@ -75,9 +75,9 @@ On a human team, judgment is distributed. The PM has opinions. The tech lead pus
 
 You're the only person in the room with judgment, and you're also the one who built the room. That combination is heavier than it sounds.
 
-Some of that weight is structural, the kind that better tooling will reduce. I could have built a coach agent that monitors flow, throttles the PM when the pipeline is saturated, and flags threads that are looping without progress. Some of that I did build during the week: the auditor, the pause button, the thread guard that blocks after three failed cycles. Each one took a specific kind of tiredness off my plate.
+Some of that weight is structural. Better tooling will reduce it. I could have built a coach agent that monitors flow, throttles the PM when the pipeline is saturated, flags threads looping without progress. Some of that I did build during the week: the auditor, the pause button, the thread guard that blocks after three failed cycles. Each one took a specific kind of tiredness off my plate.
 
-But the deeper fatigue wasn't operational. It was the weight of being the only one who could judge whether the work mattered. No agent can tell you that the PM is optimizing for the wrong thing. No dashboard can flag that the product direction has quietly drifted. That kind of judgment is upstream of any tooling. I think every person running an AI team will feel it, and the ones who build good systems will feel it less on the operational side and more on the strategic side. The tooling gets better. The loneliness of judgment doesn't.
+But the deeper fatigue wasn't operational. It was being the only one who could judge whether the work mattered. No agent can tell you the PM is optimizing for the wrong thing. No dashboard flags that the product direction has quietly drifted. That judgment is upstream of any tooling. Every person running an AI team will feel it. The ones who build good systems will feel it less on the operational side and more on the strategic side. The tooling gets better. The loneliness of judgment doesn't.
 
 I abandoned a stuck thread instead of resetting it for a fourth attempt. Most people learn that "when to stop" skill by wasting weeks on something before admitting it won't work. Here I could see the pattern after three cycles. The system gave me the data to make the call fast. On a human team, the same thing plays out over two sprints before someone escalates.
 
@@ -89,15 +89,13 @@ Other days I paused the PM because the pipeline was full. Other times I flushed 
 
 Something most AI writing glosses over: this costs real money, and the waste is visible. Every proposal costs tokens. Every review costs tokens. Every rejected implementation costs tokens. When the PM generated twelve proposals and ten got rejected, those ten still showed up on the bill. When the Developer failed the same code review three times, each attempt cost money, and the third produced the same wrong answer as the first.
 
-It changed how I thought about the AI workflow economics. Don't start work the pipeline can't finish. Stop generating new proposals when existing ones haven't been reviewed. The gate has to come before the spend, not after.
+It changed how I thought about flow economics. Don't start work the pipeline can't finish. Stop generating proposals when existing ones haven't been reviewed. The gate has to come before the spend, not after.
 
 ![AI agent telemetry showing Claude and Codex LLM calls across agents with token usage and cost metrics](agents/static/screenshots/ai-agent-telemetry-token-usage.png)
 
-Here are the actual numbers from one week of running an AI agent team:
+The agents created 24 branches during the week. Four were useful. 83% waste rate. Most people assume AI means efficiency. The reality was high output, low yield. The system generates before it evaluates. Everything enters the pipeline. The pipeline does the filtering.
 
-The agents created 24 branches during the week. Four were useful. 83% waste rate. Most people assume AI means efficiency. The reality was closer to high output, low yield. The system generates before it evaluates. Everything enters the pipeline. The pipeline does the filtering.
-
-Some of that waste was avoidable. Better technical guidelines upfront, tighter scoping from the Tech Lead, more specific acceptance criteria, would have killed bad branches earlier or prevented them from starting. The PM proposed work that sounded reasonable but wasn't grounded in what the codebase could actually support. The Tech Lead approved specs that were too broad. The Developer created branches for work that was already overtaken by changes on main. Each of those is a leadership failure, not an AI failure. Better constraints set earlier would have cut the waste rate significantly.
+Some of that waste was avoidable. Better technical guidelines upfront, tighter scoping from the Tech Lead, more specific acceptance criteria would have killed bad branches earlier or prevented them entirely. The PM proposed work that sounded reasonable but wasn't grounded in what the codebase could support. The Tech Lead approved specs that were too broad. The Developer created branches for work already overtaken by changes on main. Each of those is a leadership failure, not an AI failure.
 
 This is where the experiment got personal. The people best positioned to run AI teams right now aren't pure PMs or pure engineers. They're the ones with enough depth across product, engineering, and operations to set the right constraints before the expensive work starts. If you understand the codebase well enough to scope work tightly, you prevent bad branches. If you understand the product well enough to write a real brief, you prevent scattered proposals. If you understand flow well enough to design backpressure, you prevent the pipeline from burning tokens on work it can't finish.
 
@@ -129,7 +127,7 @@ I defined what each role should care about. Wrote the PM's product brief. Decide
 
 ![AI agent thread detail showing proposal journey with blocking issues, review history, and model transcript](agents/static/screenshots/ai-agent-thread-detail-proposal.png)
 
-What prepared me for this wasn't any single skill. Years of product work taught me how to define priorities and evaluate whether work is aimed at the right problem. Engineering taught me how to build systems that are observable and debuggable. Running teams taught me when to step in and when to let things play out. This experiment pulled on all of it at once.
+What prepared me for this wasn't any single skill. Product work taught me to define priorities. Engineering taught me to build observable systems. Running teams taught me when to step in and when to back off. This experiment pulled on all of it at once.
 
 ---
 
