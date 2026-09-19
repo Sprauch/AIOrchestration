@@ -14,6 +14,29 @@ system:
   max_pending_tasks: 3      # Architect holds approvals when this many tasks await developer
   max_pending_reviews: 5    # Slows upstream (PM triggers + architect tasks) when reviews back up
 
+  # A fresh `git worktree add` has the tracked files and nothing else. Everything below is
+  # gitignored in the target project and needed anyway, so without it a developer agent
+  # can edit and typecheck but cannot build - and work that cannot be verified is worse
+  # than no work. Paths are relative to working_dir. Adjust these per project; the
+  # mechanism is generic, the paths are not.
+  worktree_setup:
+    copy_paths:
+      # Generated collection: listed in angular.json's asset globs, so a build needs it.
+      - src/assets/mtg/data/transformed
+      # Vendor input, ~629 MB: lets the agent REPRODUCE the generated data if a change
+      # requires regenerating rather than only consuming it.
+      - data-sources/mtg/AllPrintings.json
+      # Card images are deliberately NOT copied - ~467,000 files and 22 GB. Staging does
+      # not serve them either, so a grid of placeholders is the expected state there.
+    commands:
+      # Measured at 14 s against a warm npm cache. Cheaper than sharing node_modules,
+      # where one agent's `npm install` would mutate every other agent's tree.
+      - npm ci --no-audit --no-fund
+    command_timeout: 900
+    # Re-read on REUSE. A regeneration in the main checkout makes an existing worktree's
+    # copy silently wrong; this is what catches it.
+    version_file: src/assets/mtg/data/transformed/collection-manifest.json
+
 agents:
   pm:
     count: 1

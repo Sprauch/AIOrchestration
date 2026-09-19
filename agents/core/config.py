@@ -79,6 +79,28 @@ class AgentConfig(BaseModel):
 SafetySettings = SafetyConfig
 
 
+class WorktreeSetupConfig(BaseModel):
+    """What a fresh worktree needs before it can build.
+
+    `git worktree add` gives you the tracked files and nothing else, so anything the
+    build needs that is gitignored - dependencies, generated data, vendor inputs - has to
+    be put there, or an agent produces work it could not have verified.
+
+    Paths are relative to working_dir and are COPIED, not linked: a link means one agent
+    writing to generated data corrupts it for every other agent at once, where a copy
+    confines the mistake to one worktree.
+    """
+
+    # Named copy_paths rather than copy, which would shadow BaseModel.copy.
+    copy_paths: list[str] = Field(default_factory=list)
+    commands: list[str] = Field(default_factory=list)
+    command_timeout: int = 900
+    # Re-read when a worktree is REUSED. If it differs from the main checkout's, the
+    # copies are stale and are made again. This is the cost of choosing copy over link,
+    # paid deliberately rather than discovered by building against last week's data.
+    version_file: str | None = None
+
+
 class SystemConfig(BaseSettings):
     """System-level config. Env vars with AGENT_ORCH_ prefix override YAML values.
 
@@ -123,6 +145,7 @@ class SystemConfig(BaseSettings):
     pipeline_repair_interval: int = 60
     analysis_context: str = ""  # optional context prepended to startup triggers
     dogfood_mode: bool = False  # explicit opt-in for self-analysis behavior
+    worktree_setup: WorktreeSetupConfig | None = None  # see WorktreeSetupConfig
 
     # working_dir existence is checked by preflight, not at config parse time.
     # This allows config to be loaded before the target directory is mounted

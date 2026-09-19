@@ -21,6 +21,7 @@ from agents.core.metrics import Metrics
 from agents.core.output_schema import get_output_schema_for_role
 from agents.core.preflight import run_preflight, stamp_schema_version
 from agents.core.worktree import remove_worktree
+from agents.core.worktree_setup import is_stale, setup_worktree
 from agents.core.redis_keys import (
     _active_keys,
     _active_work_count as _active_work_count_fn,
@@ -102,6 +103,13 @@ class Orchestrator:
                 cwd=worktree_dir, capture_output=True,
             )
             if check.returncode == 0:
+                # Reuse - but the copied data may have moved on in the main checkout.
+                # Building against last week's generated data is the failure a copy
+                # trades for isolation, so it is detected rather than discovered.
+                setup_cfg = getattr(self.config.system, "worktree_setup", None)
+                if setup_cfg and is_stale(base_dir, worktree_dir, setup_cfg.version_file):
+                    logger.info("Worktree %s is stale; refreshing its copies", agent_id)
+                    setup_worktree(base_dir, worktree_dir, setup_cfg)
                 return worktree_dir
             # Stale directory — remove and recreate. force=True: whatever is here is left
             # over from a crashed run and is not worth preserving.
@@ -126,6 +134,13 @@ class Orchestrator:
                 f"Cannot create worktree for {agent_id}: {exc}. "
                 f"Developer/reviewer agents require isolated worktrees."
             ) from exc
+
+        # A checkout alone is not a usable working copy. Anything gitignored that the
+        # build needs is absent, and an agent that cannot build cannot verify its own
+        # work - so a setup failure fails worktree creation rather than being logged.
+        setup_cfg = getattr(self.config.system, "worktree_setup", None)
+        if setup_cfg:
+            setup_worktree(base_dir, worktree_dir, setup_cfg)
 
         return worktree_dir
 
