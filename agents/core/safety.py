@@ -54,8 +54,21 @@ class SafetyChecker:
         Raises SafetyViolation for hard-blocked files.
         """
         for f in files:
+            norm = f.replace("\\", "/").lstrip("./")
             for protected in self.config.protected_files:
-                if f == protected or f.endswith(f"/{protected}"):
+                # A trailing slash protects a DIRECTORY and everything under it.
+                # Without this, an entry like "deploy/" matches nothing and silently
+                # protects nothing - the worst possible outcome for a safety list,
+                # since it reads as protection while providing none. Backward
+                # compatible: no entry without a trailing slash changes behaviour.
+                if protected.endswith("/"):
+                    prefix = protected.replace("\\", "/").lstrip("./")
+                    if norm.startswith(prefix) or f"/{prefix}" in f"/{norm}":
+                        raise SafetyViolation(
+                            "protected_file", f"Cannot modify {f} (under protected {protected})"
+                        )
+                    continue
+                if f == protected or f.endswith(f"/{protected}") or norm == protected:
                     raise SafetyViolation("protected_file", f"Cannot modify {f}")
 
         if len(files) > self.config.max_files_per_change:

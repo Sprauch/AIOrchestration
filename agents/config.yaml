@@ -1,7 +1,22 @@
 system:
   redis_url: "redis://localhost:6379/0"
-  working_dir: "."
+  # The repository the agents WORK ON. Left at "." the orchestrator analyses itself,
+  # which is the dogfood mode and not what this is for. The orchestrator is still run
+  # from its own directory - system_prompt and log_dir below stay relative to that.
+  working_dir: "C:/Users/hijbe/Documents/Projects/Atlas"
   log_dir: "agents/logs"
+  # Prepended to the PM's startup trigger. The PM analyses the codebase on its own
+  # initiative, so without this it discovers what the project is every single run.
+  analysis_context: >
+    Atlas is an Angular 22 and Ionic 9 progressive web application for exploring Magic:
+    The Gathering cards through structured filters, with a Node ETL that generates the
+    card collection. It has not launched publicly yet.
+    Read CLAUDE.md and docs/HANDOFF.md before proposing anything: the project keeps a
+    register of defects in docs/register/ and a backlog in docs/backlog/, and most
+    things worth doing are already written down there with reasoning attached.
+    Prefer proposals that are small, verifiable, and behaviour-preserving. Changes to
+    generated data, dependencies, the deploy path or the service worker need explicit
+    human approval and should not be proposed as routine work.
   max_concurrent_tasks: 2
   once_timeout: 1800
   max_restarts: 3
@@ -96,7 +111,10 @@ agents:
     reasoning_effort: high
     permission_mode: acceptEdits
     system_prompt: agents/prompts/developer.md
-    allowed_tools: "Edit Read Glob Grep Bash(git:*) Bash(python:*) Bash(pytest:*)"
+    # Node and Angular, not Python: the upstream default grants Bash(python:*) and
+    # Bash(pytest:*), which this project has no use for and which would leave the agent
+    # unable to run its own build, tests or lint.
+    allowed_tools: "Edit Read Glob Grep Bash(git:*) Bash(npm:*) Bash(npx:*) Bash(node:*)"
     subscribes_to: [tasks, review-results]
     publishes_to: [review-requests, progress, cli-traces]
     use_consumer_group: true
@@ -127,10 +145,40 @@ safety:
     - "git reset --hard"
     - "DROP TABLE"
     - "DELETE FROM"
+    # Project-specific. Installing or changing dependencies needs explicit human
+    # approval here, and a regeneration is a version bump plus an image pass rather
+    # than a command an agent runs on its own initiative.
+    - "npm install"
+    - "npm uninstall"
+    - "npm update"
+    - "yarn add"
+    - "production-update"
+    - "deploy-dreamhost"
   protected_files:
     - ".env"
     - "vercel.json"
     - "agents/config.yaml"
+    # The rules the agents work under. An agent that can edit its own constraints does
+    # not have constraints, so these are protected before anything else.
+    - "CLAUDE.md"
+    - ".claude/rules/"
+    - ".claude/settings.json"
+    # Dependencies and build configuration: changing these is gated on a human in this
+    # project, and B63 is an open entry about a second lockfile already causing trouble.
+    - "package.json"
+    - "package-lock.json"
+    - "yarn.lock"
+    - "angular.json"
+    # The deploy and boot path. R149 took production down twice in one day from the
+    # first of these; R140 and R151 live in the second.
+    - "deploy/"
+    - "scripts/postbuild-index.js"
+    - "ngsw-config.json"
+    # Generated data and the ETL that produces it. Editing generated JSON directly is
+    # forbidden by the project's own rules, and a regeneration is a gated operation.
+    - "src/assets/mtg/data/"
+    - "scripts/mtg/transform-card-collection.js"
+    - "scripts/mtg/vendor-refresh.js"
   branch_prefix: "agent/"
   never_push_to: ["main", "master"]
   # Actions that require human approval via `agent-orchestrator approve`.
