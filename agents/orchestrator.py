@@ -20,6 +20,7 @@ from agents.core.message_bus import MessageBus
 from agents.core.metrics import Metrics
 from agents.core.output_schema import get_output_schema_for_role
 from agents.core.preflight import run_preflight, stamp_schema_version
+from agents.core.worktree import remove_worktree
 from agents.core.redis_keys import (
     _active_keys,
     _active_work_count as _active_work_count_fn,
@@ -102,10 +103,16 @@ class Orchestrator:
             )
             if check.returncode == 0:
                 return worktree_dir
-            # Stale directory — remove and recreate
+            # Stale directory — remove and recreate. force=True: whatever is here is left
+            # over from a crashed run and is not worth preserving.
             logger.info("Removing stale worktree dir for %s", agent_id)
-            subprocess.run(["git", "worktree", "remove", "--force", worktree_dir], cwd=base_dir, capture_output=True)
-            shutil.rmtree(worktree_dir, ignore_errors=True)
+            if not remove_worktree(base_dir, worktree_dir, force=True):
+                # Adding a worktree over a directory that is still present produces a
+                # confusing git error later. Fail here, where the cause is visible.
+                raise RuntimeError(
+                    f"Could not remove stale worktree {worktree_dir} for {agent_id}. "
+                    f"Remove it by hand before restarting."
+                )
 
         try:
             Path(worktree_dir).parent.mkdir(parents=True, exist_ok=True)
@@ -1070,21 +1077,27 @@ class Orchestrator:
         if not wt_root.exists():
             return
         cleaned = 0
+        failed = 0
         for d in wt_root.iterdir():
             if not d.is_dir():
                 continue
             name = d.name
             if not (name.startswith("developer-") or name.startswith("reviewer-")):
                 continue
-            subprocess.run(
-                ["git", "worktree", "remove", "--force", str(d)],
-                cwd=base_dir, capture_output=True,
-            )
-            if d.exists():
-                shutil.rmtree(d, ignore_errors=True)
-            cleaned += 1
+            # force=True: startup cleanup is crash recovery, and the tree is garbage.
+            if remove_worktree(base_dir, d, force=True):
+                cleaned += 1
+            else:
+                failed += 1
         if cleaned:
             logger.info("Startup: cleaned %d stale worktrees from previous run", cleaned)
+        if failed:
+            # Previously this path could not report anything. It now can, and must:
+            # a worktree that survives cleanup is disk that never comes back.
+            logger.error(
+                "Startup: %d stale worktree(s) could NOT be removed and will accumulate. "
+                "Remove them by hand.", failed,
+            )
 
     async def _cleanup_stale_agent_keys(self) -> None:
         """Remove agent:* keys from previous runs so the dashboard starts clean."""
