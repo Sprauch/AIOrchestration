@@ -11,8 +11,8 @@ system:
   restart_delay: 5
   gate_timeout: 300
   max_pending_proposals: 3  # PM pauses when this many proposals await technical review
-  max_pending_tasks: 3      # Tech Lead holds approvals when this many tasks await developer
-  max_pending_reviews: 5    # Slows upstream (PM triggers + tech lead tasks) when reviews back up
+  max_pending_tasks: 3      # Architect holds approvals when this many tasks await developer
+  max_pending_reviews: 5    # Slows upstream (PM triggers + architect tasks) when reviews back up
 
 agents:
   pm:
@@ -25,11 +25,12 @@ agents:
     publishes_to: [proposals, cli-traces]
     schedule:
       trigger: startup
-    deliberation:
-      cli: codex
-      model: gpt-5.4
-      reasoning_effort: medium
-      rounds: 2
+    # Deliberation disabled: codex is not installed and there is no subscription.
+    # deliberation:
+    #   cli: codex
+    #   model: gpt-5.4
+    #   reasoning_effort: medium
+    #   rounds: 2
 
   product_designer:
     count: 1
@@ -40,24 +41,36 @@ agents:
     subscribes_to: [proposals]
     publishes_to: [design-feedback, cli-traces]
 
-  tech_lead:
+  # The architect carries the full context and forwards each role only what that role
+  # needs to execute faithfully towards expectation. It is the ONLY role that needs
+  # breadth, which is what earns it the expensive model - and everyone downstream is
+  # cheap BECAUSE it was expensive. A task_assignment is a context package, not an
+  # instruction: name the files, the constraints and what "done" means, and the developer
+  # arrives oriented rather than rediscovering it with a model chosen for writing code.
+  architect:
     count: 1
     cli: claude
-    model: sonnet
+    model: opus
+    reasoning_effort: high
     permission_mode: plan
-    system_prompt: agents/prompts/tech_lead.md
+    system_prompt: agents/prompts/architect.md
     subscribes_to: [proposals, design-feedback]
     publishes_to: [reviews, tasks, cli-traces]
-    deliberation:
-      cli: codex
-      model: gpt-5.4
-      reasoning_effort: medium
-      rounds: 2
+    # Deliberation disabled: codex is not installed and there is no subscription.
+    # deliberation:
+    #   cli: codex
+    #   model: gpt-5.4
+    #   reasoning_effort: medium
+    #   rounds: 2
 
+  # Sonnet at high effort, not opus. The upstream default spends the most expensive model
+  # here; this executes against a context package it did not have to derive. High effort
+  # because a defect that looks mechanical is usually causal underneath.
   developer:
-    count: 2          # each developer gets an isolated git worktree
+    count: 1          # one worktree: reduce batch size before attacking bottlenecks
     cli: claude
-    model: opus
+    model: sonnet
+    reasoning_effort: high
     permission_mode: acceptEdits
     system_prompt: agents/prompts/developer.md
     allowed_tools: "Edit Read Glob Grep Bash(git:*) Bash(python:*) Bash(pytest:*)"
@@ -65,13 +78,21 @@ agents:
     publishes_to: [review-requests, progress, cli-traces]
     use_consumer_group: true
 
+  # KNOWN LIMITATION, recorded rather than glossed: upstream puts the reviewer on codex
+  # deliberately, so a model does not review its own family's output. codex is not
+  # installed here and there is no subscription, so it runs on claude and that bias
+  # protection is lost. High effort because this project's expensive failures were
+  # invisible in the diff - a rule that was correct but produced the wrong output, a
+  # verification shaped so it could not fail, a number taken from a single run.
   reviewer:
     count: 1
-    cli: codex
-    model: gpt-5.4
-    codex_mode: exec
-    sandbox: read-only
-    reasoning_effort: medium
+    cli: claude
+    model: sonnet
+    reasoning_effort: high
+    permission_mode: plan
+    # Replaces codex's `sandbox: read-only`. A reviewer that can edit is a defect, so the
+    # inability is made explicit here rather than left to permission_mode alone.
+    allowed_tools: "Read Glob Grep Bash(git diff:*) Bash(git log:*) Bash(git show:*)"
     system_prompt: agents/prompts/reviewer.md
     subscribes_to: [review-requests]
     publishes_to: [review-results, cli-traces]
