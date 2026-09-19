@@ -77,7 +77,7 @@ class PMAgent(AgentProcess):
                 "estimated_effort": str(p.get("estimated_effort", "medium"))[:20],
                 "category": str(p.get("category", "quality"))[:30],
             }
-            recipient_role = "product_designer" if clean["target_area"] in self.USER_FACING_TARGETS else "tech_lead"
+            recipient_role = "product_designer" if clean["target_area"] in self.USER_FACING_TARGETS else "architect"
             # Thread ID resolution:
             # 1. If the agent's output specifies thread_id, use it
             # 2. If this is a revision (architect feedback), preserve source thread

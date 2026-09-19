@@ -89,5 +89,5 @@ class ProductDesignerAgent(AgentProcess):
             message_type=MessageType.DESIGN_FEEDBACK,
             payload=feedback,
             thread_id=source_envelope.thread_id,
-            recipient_role="tech_lead",
+            recipient_role="architect",
         )]

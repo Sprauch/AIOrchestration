@@ -103,7 +103,7 @@ class SystemConfig(BaseSettings):
     gate_timeout: int = 86400
     max_wip: int = 0  # deprecated: if >0, overrides all per-stage limits below
     max_pending_proposals: int = 3  # PM pauses when this many proposals await technical review
-    max_pending_tasks: int = 3  # Tech Lead holds approvals when this many tasks await developer
+    max_pending_tasks: int = 3  # Architect holds approvals when this many tasks await developer
     max_pending_reviews: int = 5  # Slows upstream (PM triggers + tech lead tasks) when reviews back up
     web_gate_token: str | None = None
     # Self-healing

@@ -704,7 +704,7 @@ class WebDashboard:
             state_map = {
                 "analyzing": "Being analyzed by PM",
                 "proposed": "Proposal submitted, awaiting technical review",
-                "approved": "Tech Lead approved, awaiting developer",
+                "approved": "Architect approved, awaiting developer",
                 "revision_requested": "PM revising based on tech lead feedback",
                 "implementing": "Developer implementing on " + (t["branch"] or "agent branch"),
                 "awaiting_review": "Implementation complete, awaiting reviewer",
@@ -720,7 +720,7 @@ class WebDashboard:
             # Next step
             next_map = {
                 "analyzing": "PM will produce structured proposals",
-                "proposed": "Tech Lead will review for feasibility and risk",
+                "proposed": "Architect will review for feasibility and risk",
                 "approved": "Developer will be assigned to implement",
                 "revision_requested": "PM will revise and resubmit",
                 "implementing": "Developer will submit for code review when done",
@@ -757,7 +757,7 @@ class WebDashboard:
                 if t["last_decision"] == "approved":
                     latest_change = {
                         "kind": "approved",
-                        "summary": "Tech Lead approved the proposal",
+                        "summary": "Architect approved the proposal",
                         "detail": "This thread moved into implementation.",
                         "time": t["last_time"],
                         "timestamp": t["last_timestamp"],
@@ -765,7 +765,7 @@ class WebDashboard:
                 elif t["last_decision"] in ("needs_revision", "needs_clarification"):
                     latest_change = {
                         "kind": "sent_back",
-                        "summary": "Tech Lead sent this back to PM",
+                        "summary": "Architect sent this back to PM",
                         "detail": "PM needs to revise and resubmit the proposal.",
                         "time": t["last_time"],
                         "timestamp": t["last_timestamp"],
@@ -773,7 +773,7 @@ class WebDashboard:
                 elif t["last_decision"] == "rejected":
                     latest_change = {
                         "kind": "rejected",
-                        "summary": "Tech Lead rejected the proposal",
+                        "summary": "Architect rejected the proposal",
                         "detail": "This thread will not continue unless resubmitted.",
                         "time": t["last_time"],
                         "timestamp": t["last_timestamp"],
@@ -782,7 +782,7 @@ class WebDashboard:
                 latest_change = {
                     "kind": "proposal",
                     "summary": "PM submitted a proposal",
-                    "detail": "Tech Lead review is next.",
+                    "detail": "Architect review is next.",
                     "time": t["last_time"],
                     "timestamp": t["last_timestamp"],
                 }

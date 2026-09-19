@@ -46,7 +46,7 @@ Your response MUST be exactly one JSON object:
   "messages": [
     {
       "message_type": "design_feedback",
-      "recipient_role": "pm|tech_lead",
+      "recipient_role": "pm|architect",
       "payload": {
         "summary": "Short statement of the design issue or opportunity",
         "user_experience_problem": "What is confusing, heavy, unclear, or hard to trust",

@@ -68,7 +68,7 @@ PROPOSAL_MESSAGE = deepcopy(MESSAGE_BASE)
 PROPOSAL_MESSAGE["properties"]["message_type"] = {"type": "string", "const": "proposal"}
 PROPOSAL_MESSAGE["properties"]["recipient_role"] = {
     "type": "string",
-    "enum": ["tech_lead", "product_designer"],
+    "enum": ["architect", "product_designer"],
 }
 PROPOSAL_MESSAGE["properties"]["payload"] = PROPOSAL_PAYLOAD
 
@@ -90,7 +90,7 @@ DESIGN_FEEDBACK_PAYLOAD = {
 
 DESIGN_FEEDBACK_MESSAGE = deepcopy(MESSAGE_BASE)
 DESIGN_FEEDBACK_MESSAGE["properties"]["message_type"] = {"type": "string", "const": "design_feedback"}
-DESIGN_FEEDBACK_MESSAGE["properties"]["recipient_role"] = {"type": "string", "const": "tech_lead"}
+DESIGN_FEEDBACK_MESSAGE["properties"]["recipient_role"] = {"type": "string", "const": "architect"}
 DESIGN_FEEDBACK_MESSAGE["properties"]["payload"] = DESIGN_FEEDBACK_PAYLOAD
 
 
@@ -249,7 +249,7 @@ def _schema_for_messages(messages: list[dict]) -> dict:
 ROLE_OUTPUT_SCHEMAS = {
     "pm": _schema_for_messages([PROPOSAL_MESSAGE]),
     "product_designer": _schema_for_messages([DESIGN_FEEDBACK_MESSAGE]),
-    "tech_lead": _schema_for_messages([PROPOSAL_REVIEW_MESSAGE, TASK_ASSIGNMENT_MESSAGE]),
+    "architect": _schema_for_messages([PROPOSAL_REVIEW_MESSAGE, TASK_ASSIGNMENT_MESSAGE]),
     "developer": _schema_for_messages([TASK_PROGRESS_MESSAGE, REVIEW_REQUEST_MESSAGE]),
     "reviewer": _schema_for_messages([REVIEW_RESULT_MESSAGE]),
 }

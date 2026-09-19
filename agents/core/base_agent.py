@@ -176,7 +176,7 @@ class AgentProcess(ABC):
                 if not claimed:
                     continue
                 claimed_stage = "designs"
-            elif self.role == "tech_lead" and envelope.message_type in (MessageType.PROPOSAL, MessageType.DESIGN_FEEDBACK):
+            elif self.role == "architect" and envelope.message_type in (MessageType.PROPOSAL, MessageType.DESIGN_FEEDBACK):
                 claimed = await self._claim_stage_work("proposals", envelope.thread_id)
                 if not claimed:
                     continue
@@ -413,7 +413,7 @@ class AgentProcess(ABC):
         """Per-stage backpressure. Returns True if this agent should back off.
 
         PM: gated by unresolved proposal backlog
-        Tech Lead: NOT gated at message level (gated at publish time for tasks)
+        Architect: NOT gated at message level (gated at publish time for tasks)
         Developer/Reviewer: never gated (they drain the pipeline)
         """
         if self.role == "pm":

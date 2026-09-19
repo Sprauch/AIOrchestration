@@ -41,12 +41,12 @@ from agents.core.state import load_snapshot_from_connection
 # ── Styles ──────────────────────────────────────────────────
 
 ROLE_ICONS = {
-    "pm": "PM", "product_designer": "PD", "tech_lead": "TL", "developer": "DEV",
+    "pm": "PM", "product_designer": "PD", "architect": "ARCH", "developer": "DEV",
     "reviewer": "REV", "system": "SYS", "human": "HMN",
     "challenger": "CHAL",
 }
 ROLE_COLORS = {
-    "pm": "blue", "product_designer": "cyan", "tech_lead": "yellow", "developer": "green",
+    "pm": "blue", "product_designer": "cyan", "architect": "yellow", "developer": "green",
     "reviewer": "magenta", "system": "white", "human": "cyan",
     "challenger": "red",
 }
@@ -1305,7 +1305,7 @@ class MonitorApp(App):
         # Throughput
         lines.append("Throughput")
         lines.append(_row("Total messages", "messages:total"))
-        for role in ("pm", "product_designer", "tech_lead", "developer", "reviewer"):
+        for role in ("pm", "product_designer", "architect", "developer", "reviewer"):
             if _val(f"messages:{role}") > 0:
                 lines.append(_row(f"  {role}", f"messages:{role}"))
         lines.append("")
@@ -1313,7 +1313,7 @@ class MonitorApp(App):
         # Failures
         lines.append("Failures")
         lines.append(_row("Total errors", "errors:total"))
-        for role in ("pm", "product_designer", "tech_lead", "developer", "reviewer"):
+        for role in ("pm", "product_designer", "architect", "developer", "reviewer"):
             if _val(f"errors:{role}") > 0:
                 lines.append(_row(f"  {role}", f"errors:{role}"))
         lines.append("")

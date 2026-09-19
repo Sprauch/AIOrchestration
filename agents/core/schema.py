@@ -6,7 +6,7 @@ Every agent outputs:
   "messages": [
     {
       "message_type": "proposal|proposal_review|task_assignment|...",
-      "recipient_role": "pm|product_designer|tech_lead|developer|reviewer|null",
+      "recipient_role": "pm|product_designer|architect|developer|reviewer|null",
       "thread_id": "optional",
       "payload": { ... role-specific ... }
     }
@@ -32,7 +32,7 @@ VALID_MESSAGE_TYPES = {
     "task_progress", "review_request", "review_result", "system",
 }
 
-VALID_ROLES = {"pm", "product_designer", "tech_lead", "developer", "reviewer", None}
+VALID_ROLES = {"pm", "product_designer", "architect", "developer", "reviewer", None}
 
 
 def parse_agent_output(raw: str) -> list[dict]:
@@ -135,7 +135,7 @@ def _convert_legacy(data) -> list[dict]:
             return [
                 {
                     "message_type": "proposal",
-                    "recipient_role": "tech_lead",
+                    "recipient_role": "architect",
                     "payload": p,
                 }
                 for p in proposals
@@ -146,13 +146,13 @@ def _convert_legacy(data) -> list[dict]:
     if isinstance(data, list) and data and isinstance(data[0], dict):
         if "title" in data[0]:
             return [
-                {"message_type": "proposal", "recipient_role": "tech_lead", "payload": p}
+                {"message_type": "proposal", "recipient_role": "architect", "payload": p}
                 for p in data if isinstance(p, dict)
             ]
 
     # Single proposal: {"title": ...}
     if isinstance(data, dict) and "title" in data and "decision" not in data:
-        return [{"message_type": "proposal", "recipient_role": "tech_lead", "payload": data}]
+        return [{"message_type": "proposal", "recipient_role": "architect", "payload": data}]
 
     # Architect legacy: {"decision": ..., "technical_spec": ...}
     # Reviewer legacy: {"decision": ..., "comments": [...], "blocking_issues": [...]}

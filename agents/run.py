@@ -331,7 +331,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     # -- run (service) --
     p_run = subparsers.add_parser("run", help="Start the orchestrator service")
-    p_run.add_argument("--agent", choices=["pm", "product_designer", "tech_lead", "developer", "reviewer"],
+    p_run.add_argument("--agent", choices=["pm", "product_designer", "architect", "developer", "reviewer"],
                        help="Start only a specific agent role")
     p_run.add_argument("--id", dest="agent_id", help="Custom agent ID (e.g., dev-1)")
     p_run.add_argument("--config", default="agents/config.yaml", help="Config file path")

@@ -41,7 +41,7 @@ Your response MUST be exactly one JSON object:
   "messages": [
     {
       "message_type": "proposal",
-      "recipient_role": "tech_lead",
+      "recipient_role": "architect",
       "payload": {
         "title": "Short descriptive title",
         "target_area": "product|ux|trust|reliability|technical|cost|onboarding|workflow",

@@ -33,21 +33,21 @@ from agents.roles.developer_agent import DeveloperAgent
 from agents.roles.pm_agent import PMAgent, PMDeliberatingAgent
 from agents.roles.product_designer_agent import ProductDesignerAgent
 from agents.roles.reviewer_agent import ReviewerAgent
-from agents.roles.tech_lead_agent import TechLeadAgent, TechLeadDeliberatingAgent
+from agents.roles.architect_agent import ArchitectAgent, ArchitectDeliberatingAgent
 
 logger = logging.getLogger(__name__)
 
 ROLE_CLASSES: dict[str, type[AgentProcess]] = {
     "pm": PMAgent,
     "product_designer": ProductDesignerAgent,
-    "tech_lead": TechLeadAgent,
+    "architect": ArchitectAgent,
     "developer": DeveloperAgent,
     "reviewer": ReviewerAgent,
 }
 
 ROLE_DELIBERATING_CLASSES: dict[str, type] = {
     "pm": PMDeliberatingAgent,
-    "tech_lead": TechLeadDeliberatingAgent,
+    "architect": ArchitectDeliberatingAgent,
 }
 
 
@@ -83,7 +83,7 @@ class Orchestrator:
         """Get working directory for an agent.
 
         Developers and reviewers get isolated git worktrees to prevent
-        branch conflicts and dirty-read issues. PM, Product Designer, and Tech Lead share
+        branch conflicts and dirty-read issues. PM, Product Designer, and Architect share
         the main directory (they only read in plan mode).
         """
         base_dir = self.config.system.working_dir
@@ -352,7 +352,7 @@ class Orchestrator:
     PIPELINE_STAGES = [
         {"roles": ["pm"], "wait_for": None},
         {"roles": ["product_designer"], "wait_for": "proposals"},
-        {"roles": ["tech_lead"], "wait_for": ["proposals", "design-feedback"]},
+        {"roles": ["architect"], "wait_for": ["proposals", "design-feedback"]},
         {"roles": ["developer"], "wait_for": "tasks"},
         {"roles": ["reviewer"], "wait_for": "review-requests"},
     ]
