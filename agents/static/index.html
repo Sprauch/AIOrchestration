@@ -157,15 +157,17 @@
       <!-- The purpose is stated on the page because it is the thing most easily lost. The
            retrospective does not exist to find faults and fix them; it exists so that a
            proposal to change something can be argued from the risk a root cause carries
-           OVER TIME against the cost and the risk of the change itself. Without that
-           balance, every finding reads as urgent and the expensive ones are indistinguishable
-           from the cheap ones. -->
+           OVER TIME against the cost and the risk of the change itself.
+           THE CHANGE IS ITSELF A RISK, which is the half that gets forgotten: a fix made
+           without understanding the cause it is aimed at can introduce something worse
+           than the thing it patched. That is the cost of reacting, not merely a matter of
+           spending attention in the wrong order. -->
       <div class="retro-purpose">
         <strong>Why this exists:</strong> not to fix what went wrong, but to decide what is
         worth changing. A root cause area is worth addressing when the risk it carries over
         time outweighs the effort of the change and the risk the change itself introduces.
-        Fixing immediately, without that balance, spends the most on whatever failed most
-        recently.
+        Fixing immediately, without that understanding, risks introducing new and larger
+        issues than what got patched.
       </div>
 
       <div class="sub-tabs">
