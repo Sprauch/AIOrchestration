@@ -644,18 +644,29 @@ def test_create_cli_session_codex(tmp_path):
 
 
 def test_pipeline_stages_structure():
-    """PIPELINE_STAGES has the expected structure."""
+    """PIPELINE_STAGES has the expected structure.
+
+    Five stages, not the upstream four: product_designer sits between the PM and the
+    architect, which is why the architect waits on design-feedback as well as proposals.
+    Asserting the roles by name rather than only the count means a future role change
+    reports what moved instead of only that a number differs.
+    """
     stages = Orchestrator.PIPELINE_STAGES
-    assert len(stages) == 4
+    assert [s["roles"] for s in stages] == [
+        ["pm"], ["product_designer"], ["architect"], ["developer"], ["reviewer"],
+    ]
     assert stages[0]["wait_for"] is None  # PM starts immediately
     assert stages[1]["wait_for"] == "proposals"
-    assert stages[2]["wait_for"] == "tasks"
-    assert stages[3]["wait_for"] == "review-requests"
+    assert stages[2]["wait_for"] == ["proposals", "design-feedback"]
+    assert stages[3]["wait_for"] == "tasks"
+    assert stages[4]["wait_for"] == "review-requests"
 
 
 def test_role_classes_contain_all_roles():
-    """ROLE_CLASSES maps all four standard roles."""
-    assert set(ROLE_CLASSES.keys()) == {"pm", "architect", "developer", "reviewer"}
+    """ROLE_CLASSES maps all five standard roles."""
+    assert set(ROLE_CLASSES.keys()) == {
+        "pm", "product_designer", "architect", "developer", "reviewer",
+    }
 
 
 # ── Shutdown ─────────────────────────────────────────────

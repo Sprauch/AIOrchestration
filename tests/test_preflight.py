@@ -1,6 +1,7 @@
 """Tests for preflight checks."""
 
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 
@@ -94,9 +95,20 @@ def test_config_invalid_deliberation_cli():
     assert any("deliberation.cli" in e for e in errors)
 
 
-def test_config_unwritable_log_dir():
+def test_config_unwritable_log_dir(tmp_path):
+    """A log_dir that cannot be created is reported.
+
+    The fixture used to be /root/no_permission/logs, which is unwritable on Linux but on
+    Windows resolves to C:\\root\\no_permission\\logs and is created without complaint —
+    so the check looked broken when it was the fixture that did not hold, and the test
+    littered the drive on every run. Nesting a directory under a FILE cannot succeed on
+    any platform, which tests the same thing without depending on who is running it.
+    """
+    blocker = tmp_path / "not-a-directory"
+    blocker.write_text("")
+
     config = OrchestratorConfig.model_validate({
-        "system": {"log_dir": "/root/no_permission/logs"},
+        "system": {"log_dir": str(blocker / "logs")},
         "agents": {
             "pm": {"subscribes_to": ["system"], "publishes_to": ["proposals"]},
         }
@@ -123,8 +135,13 @@ async def test_run_preflight_catches_errors():
 # ── CLI probing ────────────────────────────────────────────
 
 def test_probe_cli_python():
-    """python3 should always be probeable in our test environment."""
-    ok, detail = _probe_cli("python3")
+    """A CLI that exists should probe successfully.
+
+    Probes the interpreter running the tests rather than the name "python3", which does
+    not exist on Windows — where the test reported a broken probe for a working one. The
+    running interpreter is the one executable guaranteed to be present everywhere.
+    """
+    ok, detail = _probe_cli(sys.executable)
     assert ok is True
     assert "Python" in detail or "python" in detail.lower()
 

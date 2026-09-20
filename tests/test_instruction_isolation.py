@@ -1,8 +1,15 @@
 """Tests for instruction isolation and prompt delivery."""
 
+import os
+
 import pytest
 
-from agents.core.cli_session import ClaudeSession, CodexSession
+from agents.core.cli_session import (
+    ClaudeSession,
+    CodexSession,
+    _native_exe_behind_shim,
+    resolve_cli,
+)
 from agents.core.output_schema import get_output_schema_for_role
 from agents.core.message import Envelope, MessageType
 from agents.core.safety import SafetyChecker, SafetyConfig
@@ -118,7 +125,10 @@ def test_claude_session_builds_command_with_effort_and_schema():
 
     cmd = session._build_command()
 
-    assert cmd[:5] == ["claude", "--print", "--verbose", "--output-format", "stream-json"]
+    # cmd[0] is a RESOLVED PATH, not the bare name: CreateProcess cannot run an npm
+    # shim by bare name on Windows.
+    assert cmd[0] == resolve_cli("claude")
+    assert cmd[1:5] == ["--print", "--verbose", "--output-format", "stream-json"]
     assert "--permission-mode" in cmd
     assert "--model" in cmd
     assert "--effort" in cmd
@@ -126,6 +136,68 @@ def test_claude_session_builds_command_with_effort_and_schema():
     assert "--allowedTools" in cmd
     assert "--json-schema" in cmd
     assert cmd[-1] == "-"
+
+
+# ── Shim resolution ──────────────────────────────────────
+#
+# A batch shim runs under cmd.exe, where A RAW NEWLINE IN AN ARGUMENT ENDS THE COMMAND
+# LINE. Every system prompt is multi-line, so pointing at claude.CMD silently discarded
+# every flag after --append-system-prompt: the configured model, the permission mode,
+# allowed_tools and the output schema. Exit code 0, no warning. These tests exist so that
+# cannot come back unnoticed.
+#
+# Windows-only: the shim format, and the failure, are Windows-only.
+
+_WINDOWS_ONLY = pytest.mark.skipif(os.name != "nt", reason="npm .CMD shims are Windows-only")
+
+
+@_WINDOWS_ONLY
+def test_native_exe_behind_shim_reads_the_target_out_of_the_shim(tmp_path):
+    exe = tmp_path / "node_modules" / "pkg" / "bin" / "tool.exe"
+    exe.parent.mkdir(parents=True)
+    exe.write_bytes(b"")
+    shim = tmp_path / "tool.CMD"
+    shim.write_text('@ECHO off\r\n"%dp0%\\node_modules\\pkg\\bin\\tool.exe"   %*\r\n')
+
+    assert _native_exe_behind_shim(str(shim)) == str(exe)
+
+
+@_WINDOWS_ONLY
+def test_native_exe_behind_shim_ignores_a_target_that_does_not_exist(tmp_path):
+    """Never hand back a path that is not there — the caller's own error is clearer."""
+    shim = tmp_path / "tool.CMD"
+    shim.write_text('"%dp0%\\node_modules\\pkg\\bin\\tool.exe" %*')
+
+    assert _native_exe_behind_shim(str(shim)) is None
+
+
+@_WINDOWS_ONLY
+def test_native_exe_behind_shim_ignores_an_expansion_it_cannot_resolve(tmp_path):
+    """An unknown %VAR% is not guessed at."""
+    shim = tmp_path / "tool.CMD"
+    shim.write_text('"%SOMEWHERE_ELSE%\\tool.exe" %*')
+
+    assert _native_exe_behind_shim(str(shim)) is None
+
+
+def test_native_exe_behind_shim_ignores_anything_that_is_not_a_shim(tmp_path):
+    exe = tmp_path / "tool.exe"
+    exe.write_bytes(b"")
+
+    assert _native_exe_behind_shim(str(exe)) is None
+
+
+def test_role_output_schema_carries_no_meta_schema_key():
+    """A $schema key made the Claude CLI reject the schema outright.
+
+    `--json-schema is not a valid JSON Schema: no schema with key or ref
+    "https://json-schema.org/draft/2020-12/schema"` — the flag was refused, so no schema
+    was enforced and agents invented their own output shape.
+    """
+    for role in ("pm", "product_designer", "architect", "developer", "reviewer"):
+        schema = get_output_schema_for_role(role)
+        assert schema is not None
+        assert "$schema" not in schema, f"{role} schema would be rejected by the CLI"
 
 
 def test_role_output_schema_shapes_pm_messages():

@@ -99,6 +99,7 @@ class FakeBus:
         self.published: list[tuple[str, Envelope]] = []
         self.redis = FakeRedis()
         self._queue: asyncio.Queue[Envelope] = asyncio.Queue()
+        self._responses: dict[str, asyncio.Queue] = {}
 
     async def connect(self):
         pass
@@ -118,9 +119,29 @@ class FakeBus:
     async def get_history(self, channel, count=100):
         return []
 
+    async def wait_for_message(
+        self, channel: str, timeout_ms: int, last_id: str = "$",
+    ) -> Envelope | None:
+        """Block for one message on `channel`, or return None when the wait expires.
+
+        The double had drifted from MessageBus, which grew this method for the human
+        approval gate: base_agent blocks on a per-gate response channel, so without it
+        every gated action raised AttributeError instead of waiting. Mirrors the real
+        contract — a reply is returned, an expired wait returns None rather than raising.
+        """
+        queue = self._responses.setdefault(channel, asyncio.Queue())
+        try:
+            return await asyncio.wait_for(queue.get(), timeout=timeout_ms / 1000.0)
+        except asyncio.TimeoutError:
+            return None
+
     def inject(self, envelope: Envelope):
         """Push a message into the subscription queue."""
         self._queue.put_nowait(envelope)
+
+    def respond(self, channel: str, envelope: Envelope):
+        """Answer a waiter blocked on `channel` — the approval a human would give."""
+        self._responses.setdefault(channel, asyncio.Queue()).put_nowait(envelope)
 
 
 # ── Tests ──────────────────────────────────────────────────

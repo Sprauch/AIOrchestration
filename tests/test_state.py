@@ -65,7 +65,11 @@ def test_phase_idle_no_agents():
     result = derive_current_phase([], None)
     assert result["current_phase"] is None
     assert all(p["state"] == "inactive" for p in result["phases"])
-    assert len(result["phases"]) == 4
+    # Five phases, not the upstream four: product_designer runs between pm and
+    # architect. Named rather than counted so a change says which phase moved.
+    assert [p["name"] for p in result["phases"]] == [
+        "pm", "product_designer", "architect", "developer", "reviewer",
+    ]
 
 
 def test_phase_idle_agents_active_not_busy():
