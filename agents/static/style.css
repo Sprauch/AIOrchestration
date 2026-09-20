@@ -1224,3 +1224,24 @@ tr.click { cursor: pointer; }
   color: var(--dim);
   letter-spacing: -0.01em;
 }
+
+/* Connecting: the honest middle between "disconnected" and "working normally".
+   Blue rather than red or green - a start in progress is neither a fault nor a success,
+   and colouring it as either is what made the old sequence read as a failure that
+   mysteriously resolved. The pulse says "waiting" without anyone reading a word. */
+.brief-connecting {
+  background: var(--blue-bg);
+  border: 1px solid rgba(96,165,250,0.12);
+}
+.brief-connecting .brief-dot {
+  background: var(--blue);
+  box-shadow: 0 0 8px rgba(96,165,250,0.35);
+  animation: brief-pulse 1.4s ease-in-out infinite;
+}
+@keyframes brief-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .brief-connecting .brief-dot { animation: none; }
+}

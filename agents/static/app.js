@@ -325,7 +325,14 @@ async function refreshOverview() {
     const sb=document.getElementById('status-brief');
     if(sb){
       let statusClass='ok',statusText='System is working normally.';
-      if(!snap.orchestrator_heartbeat||(Date.now()/1000-snap.orchestrator_heartbeat)>30){statusClass='bad';statusText='Orchestrator is disconnected.';}
+      const noHeartbeat=!snap.orchestrator_heartbeat||(Date.now()/1000-snap.orchestrator_heartbeat)>30;
+      // A start takes several seconds - preflight, stale-worktree cleanup, every agent
+      // connecting - and the 5s refresh kept repainting "disconnected" throughout, which
+      // contradicted the button's own "waiting for heartbeat" a few pixels above it. Two
+      // truths on one screen read as a failure. While a start is in flight the state is
+      // CONNECTING: neither a lie nor an alarm.
+      if(noHeartbeat&&window.orchStarting){statusClass='connecting';statusText='Orchestrator is starting...';}
+      else if(noHeartbeat){statusClass='bad';statusText='Orchestrator is disconnected.';}
       else if(totalExc){statusClass='warn';statusText=totalExc+' item'+(totalExc>1?'s':'')+' need'+(totalExc===1?'s':'')+' attention.';}
       const parts=[statusText];
       if(healthy)parts.push(healthy+' in progress.');
@@ -335,6 +342,9 @@ async function refreshOverview() {
       // Rendered ABOVE the brief so it is the first thing read, and ONLY when
       // disconnected: an always-present start button on a running system is an invitation
       // to a second orchestrator against one Redis.
+      // Only when genuinely down. Not while connecting: the start is already in flight,
+      // and a second click would be refused by the server anyway - offering it invites a
+      // person to believe the first one failed.
       const startBtn=(statusClass==='bad')
         ? '<div class="brief-action"><button id="btn-start-orch" onclick="startOrchestrator()">Start orchestrator</button>'
           +'<span id="start-orch-msg"></span></div>'
@@ -1054,25 +1064,30 @@ async function startOrchestrator(){
     }
     const data=await r.json().catch(()=>({}));
     if(!r.ok||!data.started){
-      say(data.error||('failed (HTTP '+r.status+')'));
+      window.orchStarting=false;say(data.error||('failed (HTTP '+r.status+')'));
       if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
       return;
     }
     // Startup runs preflight, cleans stale worktrees and connects every agent, so the
     // heartbeat does not appear immediately. Poll rather than claim success: saying
     // "started" before it is up is how a failed start looks like a working one.
-    say('started (pid '+data.pid+'), waiting for heartbeat...');
+    // Tell the rest of the dashboard a start is in flight, so the 5s refresh shows
+    // "starting" rather than repainting "disconnected" over the top of this message.
+    window.orchStarting=true;
+    if(typeof refreshOverview==='function')refreshOverview();
+    say('started (pid '+data.pid+'), waiting for it to come up...');
     for(let i=0;i<40;i++){
       await new Promise(r=>setTimeout(r,1500));
       try{
         const s=await (await fetch('/api/orchestrator')).json();
-        if(s.running){say('');if(typeof refresh==='function')refresh();return;}
+        if(s.running){window.orchStarting=false;say('');if(typeof refreshOverview==='function')refreshOverview();return;}
       }catch(e){}
     }
+    window.orchStarting=false;
     say('started, but no heartbeat after 60s - check the orchestrator window');
     if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
   }catch(e){
-    say('failed: '+e.message);
+    window.orchStarting=false;say('failed: '+e.message);
     if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
   }
 }
