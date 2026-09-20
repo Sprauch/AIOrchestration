@@ -70,7 +70,12 @@ def spawn_orchestrator(config_path: str = "agents/config.yaml") -> int:
     if not cfg.exists():
         raise SupervisorError(f"config not found: {cfg}")
 
-    cmd = [sys.executable, "-m", "agents", "run", "--config", config_path]
+    # -u: unbuffered. Python block-buffers stdout when it is a file rather than a
+    # terminal, so a crash or a kill loses whatever had not been flushed - which is
+    # exactly what happened the first time this was used: the log ended mid-run and the
+    # one recorded error had no traceback anywhere. A log that is only complete when the
+    # process exits cleanly is no use for diagnosing the times it does not.
+    cmd = [sys.executable, "-u", "-m", "agents", "run", "--config", config_path]
 
     # Send the child's output to a FILE rather than inheriting or piping.
     #
