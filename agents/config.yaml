@@ -52,11 +52,20 @@ system:
     copy_paths:
       # Generated collection: listed in angular.json's asset globs, so a build needs it.
       - src/assets/mtg/data/transformed
-      # Vendor input, ~629 MB: lets the agent REPRODUCE the generated data if a change
-      # requires regenerating rather than only consuming it.
-      - data-sources/mtg/AllPrintings.json
-      # Card images are deliberately NOT copied - ~467,000 files and 22 GB. Staging does
-      # not serve them either, so a grid of placeholders is the expected state there.
+      # AllPrintings.json (~629 MB) IS NOT COPIED, and this is a deliberate reversal.
+      #
+      # It was here so an agent could REPRODUCE the generated data rather than only
+      # consume it. In practice that put a 629 MB single-line JSON file inside the reach
+      # of an agent holding Read, Glob and Grep, where one incautious search costs more
+      # than the task is worth - the same trap the target project has a standing rule
+      # about. Regeneration is a gated operation that should not happen unattended
+      # anyway, so the capability was never one a developer agent should have had.
+      #
+      # Data work needs that file. That is an argument for giving it to a role whose job
+      # is data work, not for handing it to every developer.
+      #
+      # Card images are likewise NOT copied - ~467,000 files and 22 GB. Staging does not
+      # serve them either, so a grid of placeholders is the expected state there.
     commands:
       # Measured at 14 s against a warm npm cache. Cheaper than sharing node_modules,
       # where one agent's `npm install` would mutate every other agent's tree.
