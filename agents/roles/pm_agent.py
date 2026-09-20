@@ -45,7 +45,7 @@ class PMAgent(AgentProcess):
                     f"The architect requested revisions.\n"
                     f"Decision: {decision}\n"
                     f"Concerns:\n"
-                    + "\n".join(f"  - {str(c)[:300]}" for c in concerns)
+                    + "\n".join(f"  - {str(c)}" for c in concerns)
                     + "\n\nRevise and resubmit your proposals as specified in your system prompt."
                 )
 
@@ -64,27 +64,36 @@ class PMAgent(AgentProcess):
             p = msg.get("payload", {})
             description = p.get("user_problem") or p.get("description", "")
             clean = {
-                "title": str(p.get("title", ""))[:100],
+                "title": str(p.get("title", "")),
                 "target_area": str(p.get("target_area", p.get("category", "")))[:40],
-                "user_problem": str(p.get("user_problem", ""))[:400],
-                "description": str(description)[:400],
-                "proposed_change": str(p.get("proposed_change", ""))[:300],
-                "rationale": str(p.get("rationale", ""))[:300],
-                "expected_user_outcome": str(p.get("expected_user_outcome", ""))[:300],
-                "success_signal": str(p.get("success_signal", ""))[:200],
+                "user_problem": str(p.get("user_problem", "")),
+                "description": str(description),
+                "proposed_change": str(p.get("proposed_change", "")),
+                "rationale": str(p.get("rationale", "")),
+                "expected_user_outcome": str(p.get("expected_user_outcome", "")),
+                "success_signal": str(p.get("success_signal", "")),
                 "priority": p.get("priority", 3),
                 "affected_files": p.get("affected_files", [])[:10],
-                "estimated_effort": str(p.get("estimated_effort", "medium"))[:20],
-                "category": str(p.get("category", "quality"))[:30],
+                "estimated_effort": str(p.get("estimated_effort", "medium")),
+                "category": str(p.get("category", "quality")),
             }
             recipient_role = "product_designer" if clean["target_area"] in self.USER_FACING_TARGETS else "architect"
-            # Thread ID resolution:
-            # 1. If the agent's output specifies thread_id, use it
-            # 2. If this is a revision (architect feedback), preserve source thread
-            # 3. Otherwise, let Envelope generate a fresh thread_id per proposal
-            tid = msg.get("thread_id")
-            if not tid and preserve_thread:
-                tid = source_envelope.thread_id
+            # THREAD IDENTITY IS NOT THE MODEL'S TO DECIDE.
+            #
+            # A proposal is the ROOT of its own flow, so it starts a new thread. A
+            # revision answering architect feedback stays on the thread it revises. The
+            # model's own thread_id is ignored here, because it has no way to know which
+            # of those two things it is doing.
+            #
+            # It used to be preferred, and the effect was that nothing could be followed.
+            # The schema REQUIRES thread_id on every message and _build_cli_prompt injects
+            # THREAD_ID: <incoming>, so the PM dutifully echoed the incoming id onto every
+            # proposal in a batch, and the "fresh thread per proposal" branch was
+            # unreachable whenever the model did as it was told. One PM turn emitted nine
+            # proposals on one thread; every descendant inherited it; one thread ended up
+            # holding 59 messages spanning fifteen unrelated pieces of work. No view can
+            # untangle that, because the grouping key genuinely is the same.
+            tid = source_envelope.thread_id if preserve_thread else None
 
             kwargs = dict(
                 sender_id=self.agent_id,

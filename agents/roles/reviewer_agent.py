@@ -37,7 +37,7 @@ class ReviewerAgent(AgentProcess):
             if tests_added:
                 prompt += f"Tests added: {', '.join(tests_added[:5])}\n"
             if notes:
-                prompt += f"Developer notes: {notes[:200]}\n"
+                prompt += f"Developer notes: {notes}\n"
             prompt += (
                 f"\nFirst, verify the branch exists by running: "
                 f"`git show-ref --verify refs/heads/{branch}`\n"
@@ -62,21 +62,22 @@ class ReviewerAgent(AgentProcess):
             if msg.get("message_type") != "review_result":
                 continue
             p = msg.get("payload", {})
-            tid = msg.get("thread_id") or source_envelope.thread_id
+            # The source envelope decides the thread, not the model. See pm_agent.
+            tid = source_envelope.thread_id
             clean = {
-                "decision": str(p.get("decision", "changes_requested"))[:30],
-                "summary": str(p.get("summary", ""))[:300],
-                "blocking_issues": [str(b)[:200] for b in p.get("blocking_issues", [])[:5]],
+                "decision": str(p.get("decision", "changes_requested")),
+                "summary": str(p.get("summary", "")),
+                "blocking_issues": [str(b) for b in p.get("blocking_issues", [])[:5]],
                 "comments": [
                     {
-                        "file": str(c.get("file", ""))[:100],
+                        "file": str(c.get("file", "")),
                         "line": c.get("line"),
-                        "severity": str(c.get("severity", ""))[:20],
-                        "comment": str(c.get("comment", ""))[:200],
+                        "severity": str(c.get("severity", "")),
+                        "comment": str(c.get("comment", "")),
                     }
                     for c in p.get("comments", [])[:10]
                 ],
-                "approval_note": str(p.get("approval_note", ""))[:300],
+                "approval_note": str(p.get("approval_note", "")),
                 "_target_agent_id": target_dev,
             }
             envelopes.append(Envelope(
@@ -120,10 +121,10 @@ class ReviewerAgent(AgentProcess):
             for line in raw.splitlines():
                 stripped = line.strip()
                 if stripped.startswith("- ") or stripped.startswith("* "):
-                    issues.append(stripped[2:][:200])
+                    issues.append(stripped[2:])
             return {
                 "decision": decision,
-                "summary": raw[:300],
+                "summary": raw,
                 "blocking_issues": issues[:5],
                 "comments": [],
                 "approval_note": "",

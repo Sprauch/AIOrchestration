@@ -260,11 +260,18 @@ def test_build_gate_context_with_files():
     assert ctx["operation"] == "protected_file"
 
 
-def test_build_gate_context_caps_files_at_20():
-    """build_gate_context caps file list at 20 entries."""
+def test_build_gate_context_shows_every_file():
+    """The gate context lists EVERY file, however many there are.
+
+    It used to stop at 20. A gate exists so a person can decide whether to allow a
+    change, and hiding the 21st file from that person defeats the only purpose the
+    context has — the more files a change touches, the more that decision depends on
+    seeing all of them.
+    """
     files = [{"path": f"f{i}.py", "protected": False} for i in range(30)]
     ctx = build_gate_context(operation="large_change", files=files)
-    assert len(ctx["files"]) == 20
+    assert len(ctx["files"]) == 30
+    assert ctx["files"][-1]["path"] == "f29.py"
 
 
 def test_build_gate_context_extra_fields():
@@ -421,3 +428,84 @@ async def test_gate_timeout_emits_system_event():
     ]
     assert len(gates) == 1
     assert evt.payload["gate_id"] == gates[0].id
+
+
+# ── assign_task gate: stop the work before it is paid for ────────────────
+
+
+def _gating_safety(actions):
+    return SafetyChecker(SafetyConfig(
+        branch_prefix="agent/",
+        never_push_to=["main", "master"],
+        human_approval_required=actions,
+        max_files_per_change=50,
+    ))
+
+
+def _task_assignment():
+    return Envelope(
+        sender_id="architect-1", sender_role="architect",
+        message_type=MessageType.TASK_ASSIGNMENT,
+        payload={
+            "branch_name": "agent/some-task",
+            "approach": "First line of the approach\nsecond line",
+            "files_to_modify": ["src/a.ts", "src/b.ts"],
+            "files_to_create": [],
+            "acceptance_criteria": ["it works"],
+            "testing_strategy": "unit tests",
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_task_assignment_is_gated_when_configured():
+    """A denied assignment dispatches no work at all.
+
+    Gating only create_pr meant the first human decision came AFTER a developer had
+    worked a full cycle in a worktree and a reviewer had read the result. If the premise
+    was wrong, the tokens were already spent. This gate is the point where saying no is
+    still free.
+    """
+    agent = _make_agent(safety=_gating_safety(["assign_task"]))
+    asked = {}
+
+    async def deny(action, reason, context, thread_id):
+        asked.update(action=action, reason=reason, context=context)
+        return False
+
+    agent._request_human_approval = deny
+    assert await agent._check_output_safety(_task_assignment()) is False
+    assert asked["action"] == "assign_task"
+    # The reason is the approach's first line, not the whole thing
+    assert asked["reason"] == "First line of the approach"
+    # The approver sees what the work actually is
+    assert asked["context"]["approach"].startswith("First line")
+    assert asked["context"]["acceptance_criteria"] == ["it works"]
+    assert asked["context"]["file_count"] == 2
+
+
+@pytest.mark.asyncio
+async def test_approved_task_assignment_proceeds():
+    agent = _make_agent(safety=_gating_safety(["assign_task"]))
+
+    async def approve(action, reason, context, thread_id):
+        return True
+
+    agent._request_human_approval = approve
+    assert await agent._check_output_safety(_task_assignment()) is True
+
+
+@pytest.mark.asyncio
+async def test_task_assignment_not_gated_when_not_configured():
+    """Leaving assign_task out of the list keeps the old behaviour exactly."""
+    agent = _make_agent(safety=_gating_safety(["create_pr"]))
+    called = False
+
+    async def should_not_run(action, reason, context, thread_id):
+        nonlocal called
+        called = True
+        return False
+
+    agent._request_human_approval = should_not_run
+    assert await agent._check_output_safety(_task_assignment()) is True
+    assert called is False

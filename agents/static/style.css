@@ -882,7 +882,7 @@ body {
 .acard-avatar.reviewer { background: var(--purple-bg); color: var(--purple); }
 .acard-name { font-weight: 600; font-size: 13px; }
 .acard-role { font-size: 11px; color: var(--dim); }
-.acard-stats { font-size: 10px; color: var(--subtle); font-family: var(--mono); }
+.acard-stats { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--subtle); font-family: var(--mono); }
 .ad-summary { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--border); }
 .ad-avatar {
   width: 44px;

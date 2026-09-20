@@ -29,11 +29,11 @@ class ArchitectAgent(AgentProcess):
                 f"Target area: {p.get('target_area', p.get('category', '?'))}\n"
                 f"Priority: {p.get('priority', '?')}\n"
                 f"Effort: {p.get('estimated_effort', '?')}\n"
-                f"User problem: {str(p.get('user_problem') or p.get('description', '?'))[:500]}\n"
-                f"Proposed change: {str(p.get('proposed_change', '?'))[:500]}\n"
-                f"Expected user outcome: {str(p.get('expected_user_outcome', '?'))[:300]}\n"
+                f"User problem: {str(p.get('user_problem') or p.get('description', '?'))}\n"
+                f"Proposed change: {str(p.get('proposed_change', '?'))}\n"
+                f"Expected user outcome: {str(p.get('expected_user_outcome', '?'))}\n"
                 f"Affected files: {', '.join(p.get('affected_files', []))}\n"
-                f"Rationale: {str(p.get('rationale', '?'))[:300]}"
+                f"Rationale: {str(p.get('rationale', '?'))}"
             )
 
         if envelope.message_type == MessageType.DESIGN_FEEDBACK:
@@ -48,14 +48,14 @@ class ArchitectAgent(AgentProcess):
                 f"Target area: {proposal.get('target_area', proposal.get('category', '?'))}\n"
                 f"Priority: {proposal.get('priority', '?')}\n"
                 f"Effort: {proposal.get('estimated_effort', '?')}\n"
-                f"User problem: {str(proposal.get('user_problem') or proposal.get('description', '?'))[:500]}\n"
-                f"Proposed change: {str(proposal.get('proposed_change', '?'))[:500]}\n"
-                f"Expected user outcome: {str(proposal.get('expected_user_outcome', '?'))[:300]}\n"
+                f"User problem: {str(proposal.get('user_problem') or proposal.get('description', '?'))}\n"
+                f"Proposed change: {str(proposal.get('proposed_change', '?'))}\n"
+                f"Expected user outcome: {str(proposal.get('expected_user_outcome', '?'))}\n"
                 f"Affected files: {', '.join(proposal.get('affected_files', []))}\n\n"
-                f"Design summary: {str(p.get('summary', ''))[:200]}\n"
-                f"Experience problem: {str(p.get('user_experience_problem', ''))[:400]}\n"
-                f"Design goal: {str(p.get('design_goal', ''))[:300]}\n"
-                f"Recommendations:\n" + "\n".join(f"  - {str(r)[:250]}" for r in recommendations)
+                f"Design summary: {str(p.get('summary', ''))}\n"
+                f"Experience problem: {str(p.get('user_experience_problem', ''))}\n"
+                f"Design goal: {str(p.get('design_goal', ''))}\n"
+                f"Recommendations:\n" + "\n".join(f"  - {str(r)}" for r in recommendations)
             )
 
         return f"Process this message type: {envelope.message_type.value}"
@@ -67,12 +67,16 @@ class ArchitectAgent(AgentProcess):
         for msg in messages:
             mt = msg.get("message_type")
             p = msg.get("payload", {})
-            tid = msg.get("thread_id") or source_envelope.thread_id
+            # The SOURCE envelope decides the thread, not the model. A downstream
+            # message always continues the thread it is answering, and a model-supplied
+            # id can only be an echo of what it was given or a hallucination - the first
+            # adds nothing, the second silently moves work onto another thread.
+            tid = source_envelope.thread_id
 
             if mt == "proposal_review":
                 clean = {
-                    "decision": str(p.get("decision", ""))[:30],
-                    "concerns": [str(c)[:300] for c in p.get("concerns", [])[:5]],
+                    "decision": str(p.get("decision", "")),
+                    "concerns": [str(c) for c in p.get("concerns", [])[:5]],
                 }
                 envelopes.append(Envelope(
                     sender_id=self.agent_id,
@@ -85,12 +89,12 @@ class ArchitectAgent(AgentProcess):
 
             elif mt == "task_assignment":
                 clean = {
-                    "approach": str(p.get("approach", ""))[:500],
-                    "branch_name": str(p.get("branch_name", ""))[:80],
-                    "files_to_modify": [str(f)[:100] for f in p.get("files_to_modify", [])[:10]],
-                    "files_to_create": [str(f)[:100] for f in p.get("files_to_create", [])[:10]],
-                    "acceptance_criteria": [str(c)[:200] for c in p.get("acceptance_criteria", [])[:5]],
-                    "testing_strategy": str(p.get("testing_strategy", ""))[:200],
+                    "approach": str(p.get("approach", "")),
+                    "branch_name": str(p.get("branch_name", "")),
+                    "files_to_modify": [str(f) for f in p.get("files_to_modify", [])[:10]],
+                    "files_to_create": [str(f) for f in p.get("files_to_create", [])[:10]],
+                    "acceptance_criteria": [str(c) for c in p.get("acceptance_criteria", [])[:5]],
+                    "testing_strategy": str(p.get("testing_strategy", "")),
                 }
                 envelopes.append(Envelope(
                     sender_id=self.agent_id,

@@ -207,7 +207,7 @@ class WebDashboard:
                 logger.info("Deleted key %s", key)
             return web.json_response({"status": "deleted", "key": key, "field": field, "member": member})
         except Exception as e:
-            return web.json_response({"error": str(e)[:200]}, status=500)
+            return web.json_response({"error": str(e)}, status=500)
 
     PR_SET_KEY = "orchestrator:created_prs"
 
@@ -270,7 +270,7 @@ class WebDashboard:
             logger.info("Published retry review-result for PR: thread %s", thread_id[:8])
             return web.json_response({"status": "retrying", "thread_id": thread_id})
         except Exception as e:
-            return web.json_response({"error": str(e)[:200]}, status=500)
+            return web.json_response({"error": str(e)}, status=500)
 
     async def _handle_index(self, request: web.Request) -> web.FileResponse:
         return web.FileResponse(STATIC_DIR / "index.html")
@@ -1173,7 +1173,7 @@ class WebDashboard:
                     time.strftime("%H:%M:%S"), request.method, request.path,
                     request.headers.get("Origin", ""),
                     "yes" if request.headers.get("Authorization") else "no",
-                    request.headers.get("User-Agent", "")[:60],
+                    request.headers.get("User-Agent", ""),
                 ))
         except OSError:
             pass
@@ -1340,7 +1340,7 @@ class WebDashboard:
                 "requeued_stage": requeued_stage,
             })
         except Exception as e:
-            return web.json_response({"error": str(e)[:200]}, status=500)
+            return web.json_response({"error": str(e)}, status=500)
 
     async def _handle_thread_abandon(self, request: web.Request) -> web.Response:
         """Mark a thread as abandoned so it stops showing as an exception."""
@@ -1369,7 +1369,7 @@ class WebDashboard:
             logger.info("Abandoned thread %s", thread_id[:8])
             return web.json_response({"status": "abandoned", "thread_id": thread_id})
         except Exception as e:
-            return web.json_response({"error": str(e)[:200]}, status=500)
+            return web.json_response({"error": str(e)}, status=500)
 
     async def _handle_traces(self, request: web.Request) -> web.Response:
         """Return recent CLI traces for the timeline visualization."""

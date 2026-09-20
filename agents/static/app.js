@@ -47,7 +47,7 @@ function evDetail(type,p) {
     case 'task_assignment':return esc(p.branch_name||'');case 'task_progress':return esc(p.status||'');
     case 'review_request':return esc(p.branch_name||'');case 'review_result':return (p.decision||'').toUpperCase();
     case 'human_gate':return esc(p.action||'');
-    case 'system':{const a=p.action||'';if(a==='pr_created')return 'PR created: '+esc((p.pr_status||'').slice(0,60));if(a==='pr_merged')return 'PR merged: '+esc((p.pr_status||'').slice(0,60));if(a==='pr_closed')return 'PR closed: '+esc((p.pr_status||'').slice(0,60));if(a==='pr_failed')return 'PR failed: '+esc((p.detail||'').slice(0,60));if(a==='pr_skipped')return 'PR skipped: '+esc((p.detail||'').slice(0,60));if(a==='cli_timeout')return esc(p.agent_id||'')+' timed out ('+p.timeout_seconds+'s)';return esc(a);}
+    case 'system':{const a=p.action||'';if(a==='pr_created')return 'PR created: '+esc((p.pr_status||''));if(a==='pr_merged')return 'PR merged: '+esc((p.pr_status||''));if(a==='pr_closed')return 'PR closed: '+esc((p.pr_status||''));if(a==='pr_failed')return 'PR failed: '+esc((p.detail||''));if(a==='pr_skipped')return 'PR skipped: '+esc((p.detail||''));if(a==='cli_timeout')return esc(p.agent_id||'')+' timed out ('+p.timeout_seconds+'s)';return esc(a);}
     default:return type.replace(/_/g,' ');
   }
 }
@@ -542,8 +542,8 @@ function renderThreadEvent(e){
   else if(e.type==='task_progress')c=formatTaskProgress(p);
   else if(e.type==='review_request')c=formatReviewRequest(p);
   else if(e.type==='review_result')c=formatReviewResult(p);
-  else if(e.type==='system'){const a=p.action||'';c='<strong>'+esc(a)+'</strong>';if(p.detail)c+=' — '+esc(String(p.detail).slice(0,200));}
-  else c=esc(JSON.stringify(p).slice(0,200));
+  else if(e.type==='system'){const a=p.action||'';c='<strong>'+esc(a)+'</strong>';if(p.detail)c+=' — '+esc(String(p.detail));}
+  else c=esc(JSON.stringify(p));
   return '<div class="tl-item"><div class="tl-dot '+e.type+'"></div><div class="tl-head">'+e.type.replace(/_/g,' ')+'</div><div class="tl-meta">'+ts+' · '+esc(e.sender)+'</div><div class="tl-body">'+c+'</div></div>';
 }
 
@@ -764,8 +764,8 @@ async function showThread(tid) {
       if(cs.challenger_concern)ch+='<div class="ch-section"><div class="ch-label">Challenger concern</div><div class="ch-concern">"'+esc(cs.challenger_concern)+'"</div></div>';
       if(cs.outcome_changed&&cs.primary_initial&&cs.primary_final){
         ch+='<div class="ch-compare">';
-        ch+='<div class="ch-before"><div class="ch-label">Original position</div><div class="ch-text">'+esc(cs.primary_initial.slice(0,200))+'</div></div>';
-        ch+='<div class="ch-after"><div class="ch-label">After challenge</div><div class="ch-text">'+esc(cs.primary_final.slice(0,200))+'</div></div>';
+        ch+='<div class="ch-before"><div class="ch-label">Original position</div><div class="ch-text">'+esc(cs.primary_initial)+'</div></div>';
+        ch+='<div class="ch-after"><div class="ch-label">After challenge</div><div class="ch-text">'+esc(cs.primary_final)+'</div></div>';
         ch+='</div>';
       }
       ch+='<div class="ch-outcome">'+(cs.rounds_used||'?')+' deliberation rounds</div>';
@@ -789,7 +789,7 @@ async function showThread(tid) {
     const blockerText=(t.blocked_reason||'').toLowerCase();
     const uniqueConcerns=(t.concerns||[]).filter(c=>{const cl=c.toLowerCase();return cl!==whyText&&cl!==blockerText&&!whyText.includes(cl.slice(0,50));});
     if(uniqueConcerns.length){
-      const visible=uniqueConcerns.slice(0,2);
+      const visible=uniqueConcerns;
       const hidden=uniqueConcerns.slice(2);
       s+='<div class="ts-row"><span class="ts-label">Concerns</span><span class="ts-value"><ul style="margin:4px 0;padding-left:18px">'+visible.map(c=>'<li style="margin:2px 0">'+esc(c)+'</li>').join('')+'</ul>';
       if(hidden.length)s+='<details style="margin-top:2px"><summary style="font-size:10px;color:var(--accent);cursor:pointer">'+hidden.length+' more</summary><ul style="margin:4px 0;padding-left:18px">'+hidden.map(c=>'<li style="margin:2px 0">'+esc(c)+'</li>').join('')+'</ul></details>';
@@ -830,7 +830,7 @@ async function retryPR(tid){const r=await fetch('/api/prs/'+tid+'/retry',{method
 async function refreshSystem(){
   if(!lastSnap)return;const snap=lastSnap;
   const g=document.getElementById('agents-grid');
-  g.innerHTML=snap.agents.length?snap.agents.map(a=>{const r=role(a.agent_id);const p=a.paused;const st=p?badge('paused'):badge(a.status);const btn=p?'<button class="gbtn ok" style="padding:3px 10px;font-size:10px;margin-top:8px" onclick="event.stopPropagation();resumeAgent(\''+a.agent_id+'\')">Resume</button>':'<button class="gbtn no" style="padding:3px 10px;font-size:10px;margin-top:8px" onclick="event.stopPropagation();pauseAgent(\''+a.agent_id+'\')">Pause</button>';return '<div class="acard" onclick="showAgent(\''+a.agent_id+'\')"><div class="acard-top"><div class="acard-avatar '+r+'">'+initials(r)+'</div><div><div class="acard-name">'+esc(a.agent_id)+'</div><div class="acard-role">'+roleTitle(r)+'</div></div><div style="margin-left:auto">'+st+'</div></div><div class="acard-stats">'+(a.heartbeat?'HB '+ago(a.heartbeat):'—')+' · '+(a.current_task?esc(a.current_task.slice(0,20)):'idle')+'</div>'+btn+'</div>';}).join(''):'<div class="empty">No agents</div>';
+  g.innerHTML=snap.agents.length?snap.agents.map(a=>{const r=role(a.agent_id);const p=a.paused;const st=p?badge('paused'):badge(a.status);const btn=p?'<button class="gbtn ok" style="padding:3px 10px;font-size:10px;margin-top:8px" onclick="event.stopPropagation();resumeAgent(\''+a.agent_id+'\')">Resume</button>':'<button class="gbtn no" style="padding:3px 10px;font-size:10px;margin-top:8px" onclick="event.stopPropagation();pauseAgent(\''+a.agent_id+'\')">Pause</button>';return '<div class="acard" onclick="showAgent(\''+a.agent_id+'\')"><div class="acard-top"><div class="acard-avatar '+r+'">'+initials(r)+'</div><div><div class="acard-name">'+esc(a.agent_id)+'</div><div class="acard-role">'+roleTitle(r)+'</div></div><div style="margin-left:auto">'+st+'</div></div><div class="acard-stats">'+(a.heartbeat?'HB '+ago(a.heartbeat):'—')+' · '+(a.current_task?esc(a.current_task):'idle')+'</div>'+btn+'</div>';}).join(''):'<div class="empty">No agents</div>';
   // Metrics
   const mt=snap.metrics,keys=Object.keys(mt).sort(),mb=document.getElementById('metrics-body');
   if(!keys.length){mb.innerHTML='<div class="empty">'+(_firstLoad?'<span class="loading-pulse">Loading data...</span>':'No metrics yet')+'</div>';}
@@ -899,7 +899,7 @@ async function showAgent(aid){
   }catch(e){console.error(e);}
 }
 async function showStream(name){document.getElementById('stream-detail-name').textContent=name;document.getElementById('stream-detail-panel').classList.add('open');try{const msgs=await(await fetch('/api/streams/'+name)).json();if(!msgs.length){document.getElementById('stream-detail-body').innerHTML='<div class="empty">Empty</div>';return;}document.getElementById('stream-detail-body').innerHTML='<table><thead><tr><th>Time</th><th>Sender</th><th>Detail</th></tr></thead><tbody>'+msgs.map(m=>'<tr><td style="color:var(--subtle)">'+esc(m.timestamp)+'</td><td class="fi-sender '+m.role+'">'+esc(m.sender)+'</td><td>'+evDetail(m.type,m.payload)+'</td></tr>').join('')+'</tbody></table>';}catch(e){}}
-async function refreshRedis(){try{const data=await(await fetch('/api/redis')).json();const cy=Object.entries(data.hashes['orchestrator:thread_cycles']||{}).sort();document.getElementById('redis-cycles').innerHTML=cy.length?cy.map(([k,v])=>'<tr><td>'+esc(k)+'</td><td'+(parseInt(v)>=3?' style="color:var(--red);font-weight:600"':'')+'>'+v+(parseInt(v)>=3?' (blocked)':'')+'</td><td><button class="gbtn ok" style="padding:2px 8px;font-size:10px" onclick="redisDelete(\'orchestrator:thread_cycles\',\''+esc(k)+'\')">Reset</button></td></tr>').join(''):'<tr><td colspan="3" class="empty">None</td></tr>';const pr=Object.entries(data.hashes['orchestrator:created_prs']||{}).sort();document.getElementById('redis-prs').innerHTML=pr.length?pr.map(([k,v])=>'<tr><td>'+esc(k.slice(0,12))+'</td><td'+(v.includes('failed')?' style="color:var(--red)"':'')+'>'+esc(v.slice(0,60))+'</td><td><button class="gbtn no" style="padding:2px 8px;font-size:10px" onclick="redisDelete(\'orchestrator:created_prs\',\''+esc(k)+'\')">Del</button></td></tr>').join(''):'<tr><td colspan="3" class="empty">None</td></tr>';}catch(e){}}
+async function refreshRedis(){try{const data=await(await fetch('/api/redis')).json();const cy=Object.entries(data.hashes['orchestrator:thread_cycles']||{}).sort();document.getElementById('redis-cycles').innerHTML=cy.length?cy.map(([k,v])=>'<tr><td>'+esc(k)+'</td><td'+(parseInt(v)>=3?' style="color:var(--red);font-weight:600"':'')+'>'+v+(parseInt(v)>=3?' (blocked)':'')+'</td><td><button class="gbtn ok" style="padding:2px 8px;font-size:10px" onclick="redisDelete(\'orchestrator:thread_cycles\',\''+esc(k)+'\')">Reset</button></td></tr>').join(''):'<tr><td colspan="3" class="empty">None</td></tr>';const pr=Object.entries(data.hashes['orchestrator:created_prs']||{}).sort();document.getElementById('redis-prs').innerHTML=pr.length?pr.map(([k,v])=>'<tr><td>'+esc(k.slice(0,12))+'</td><td'+(v.includes('failed')?' style="color:var(--red)"':'')+'>'+esc(v)+'</td><td><button class="gbtn no" style="padding:2px 8px;font-size:10px" onclick="redisDelete(\'orchestrator:created_prs\',\''+esc(k)+'\')">Del</button></td></tr>').join(''):'<tr><td colspan="3" class="empty">None</td></tr>';}catch(e){}}
 async function redisDelete(key,field,opts){if(!confirm('Delete?'))return;const body=opts?Object.assign({key},opts):field?{key,field}:{key};await fetch('/api/redis/delete',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});refreshRedis();refreshRedisInspector();}
 
 async function refreshRedisInspector() {
@@ -950,7 +950,7 @@ async function refreshRedisInspector() {
     const rp = document.getElementById('redis-prs');
     if (rp) {
       const prs = Object.entries(data.hashes['orchestrator:created_prs']||{}).sort();
-      rp.innerHTML = prs.length ? prs.map(([k,v]) => '<tr><td>'+esc(k.slice(0,12))+'</td><td'+(v.includes('failed')?' style="color:var(--red)"':'')+'>'+esc(v.slice(0,80))+'</td><td><button class="gbtn no" style="padding:2px 8px;font-size:10px" onclick="redisDelete(\'orchestrator:created_prs\',\''+esc(k)+'\')">Del</button></td></tr>').join('') : '<tr><td colspan="3" class="empty">None</td></tr>';
+      rp.innerHTML = prs.length ? prs.map(([k,v]) => '<tr><td>'+esc(k.slice(0,12))+'</td><td'+(v.includes('failed')?' style="color:var(--red)"':'')+'>'+esc(v)+'</td><td><button class="gbtn no" style="padding:2px 8px;font-size:10px" onclick="redisDelete(\'orchestrator:created_prs\',\''+esc(k)+'\')">Del</button></td></tr>').join('') : '<tr><td colspan="3" class="empty">None</td></tr>';
     }
     // Active work sets
     const aw = document.getElementById('redis-active-work');

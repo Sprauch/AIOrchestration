@@ -573,7 +573,7 @@ class MonitorApp(App):
             t.append(f"[{di}] {d.upper()}", style=f"bold {ds}")
             reasoning = p.get("reasoning", "")
             if reasoning:
-                t.append(f"  {reasoning[:60]}", style="dim")
+                t.append(f"  {reasoning}", style="dim")
         elif mt == "task_assignment":
             branch = p.get("branch_name", "?")
             t.append(f"TASK: {branch}", style="bold cyan")
@@ -586,7 +586,7 @@ class MonitorApp(App):
             t.append(f"[{di}] {s}", style=f"bold {ds}")
             summary = p.get("changes_summary", "")
             if summary:
-                t.append(f"  {summary[:50]}", style="dim")
+                t.append(f"  {summary}", style="dim")
         elif mt == "review_request":
             branch = p.get("branch_name", "?")
             tests = p.get("tests_passed", False)
@@ -1026,7 +1026,7 @@ class MonitorApp(App):
                     self._timeline_detail(log, "Files", ", ".join(files[:5]))
                 desc = p.get("description", "")
                 if desc:
-                    self._timeline_detail(log, "Description", desc[:200])
+                    self._timeline_detail(log, "Description", desc)
 
             elif mt == MessageType.PROPOSAL_REVIEW:
                 decision = p.get("decision", "?")
@@ -1037,14 +1037,14 @@ class MonitorApp(App):
                 log.write(detail)
                 reasoning = p.get("reasoning", "")
                 if reasoning:
-                    self._timeline_detail(log, "Reasoning", reasoning[:200])
+                    self._timeline_detail(log, "Reasoning", reasoning)
                 concerns = p.get("concerns", [])
                 for c in concerns[:3]:
                     self._timeline_detail(log, "Concern", c)
 
             elif mt == MessageType.TASK_ASSIGNMENT:
                 self._timeline_detail(log, "Branch", p.get("branch_name", "?"))
-                self._timeline_detail(log, "Approach", p.get("approach", "")[:150])
+                self._timeline_detail(log, "Approach", p.get("approach", ""))
                 files = p.get("files_to_modify", [])
                 if files:
                     self._timeline_detail(log, "Files", ", ".join(files[:5]))
@@ -1061,7 +1061,7 @@ class MonitorApp(App):
                 log.write(detail)
                 summary = p.get("changes_summary", "")
                 if summary:
-                    self._timeline_detail(log, "Summary", summary[:200])
+                    self._timeline_detail(log, "Summary", summary)
 
             elif mt == MessageType.REVIEW_REQUEST:
                 self._timeline_detail(log, "Branch", p.get("branch_name", "?"))
@@ -1083,7 +1083,7 @@ class MonitorApp(App):
                 log.write(detail)
                 summary = p.get("summary", "")
                 if summary:
-                    self._timeline_detail(log, "Summary", summary[:200])
+                    self._timeline_detail(log, "Summary", summary)
                 blocking = p.get("blocking_issues", [])
                 for b in blocking[:3]:
                     self._timeline_detail(log, "Blocking", b)

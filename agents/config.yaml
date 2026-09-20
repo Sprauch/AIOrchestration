@@ -50,8 +50,20 @@ system:
   # mechanism is generic, the paths are not.
   worktree_setup:
     copy_paths:
-      # Generated collection: listed in angular.json's asset globs, so a build needs it.
-      - src/assets/mtg/data/transformed
+      # NOTHING. The developer works on application code and does not get the data.
+      #
+      # The generated collection is ~292 MB and the vendor input ~629 MB. Between them
+      # they made every worktree about 921 MB of material the developer never needs to
+      # read and can only be harmed by reading - and both sat inside the reach of an
+      # agent holding Read, Glob and Grep.
+      #
+      # THE COST IS REAL AND IS ACCEPTED: without the generated collection a full
+      # `ng build` cannot complete, because angular.json's asset globs name that
+      # directory. Typecheck, lint and unit tests still run. Data work - and the data
+      # that work needs - belongs to a role whose job is data, not to every developer.
+      #
+      # Card images were never copied: ~467,000 files and 22 GB.
+      []
       # AllPrintings.json (~629 MB) IS NOT COPIED, and this is a deliberate reversal.
       #
       # It was here so an agent could REPRODUCE the generated data rather than only
@@ -71,9 +83,12 @@ system:
       # where one agent's `npm install` would mutate every other agent's tree.
       - npm ci --no-audit --no-fund
     command_timeout: 900
-    # Re-read on REUSE. A regeneration in the main checkout makes an existing worktree's
-    # copy silently wrong; this is what catches it.
-    version_file: src/assets/mtg/data/transformed/collection-manifest.json
+    # No version_file, because nothing is copied any more. It existed to catch a
+    # regeneration in the main checkout making a worktree's COPY silently wrong; with no
+    # copy there is nothing to go stale, and leaving it set would mark every worktree
+    # stale forever and re-run npm ci on every reuse. It comes back with the role that
+    # gets the data.
+    version_file: null
 
 agents:
   pm:
@@ -218,6 +233,16 @@ safety:
   # and be blocked after gate_timeout seconds.
   # Remove items from this list to run fully autonomously.
   human_approval_required:
+    # THE EXPENSIVE DECISION IS "START THIS", NOT "SHIP THIS".
+    #
+    # With only create_pr gated, a task ran the whole cycle - developer works a worktree,
+    # reviewer reads the diff - and the first human decision came after all of it was
+    # paid for. If the premise was wrong, the tokens were already gone. The architect
+    # rejects proposals on their premise often enough that this is a real cost, not a
+    # hypothetical one.
+    #
+    # assign_task blocks at the point where refusing is still free.
+    - assign_task            # Nothing is built until a human says so
     - delete_files
     - modify_database
     - create_pr              # Human reviews before PR is created

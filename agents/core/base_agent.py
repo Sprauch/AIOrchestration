@@ -676,6 +676,49 @@ class AgentProcess(ABC):
 
         payload = envelope.payload
 
+        # GATE THE WORK BEFORE IT IS DONE, NOT AFTER.
+        #
+        # A task_assignment is the moment the pipeline commits real money: a developer
+        # takes it, works a full cycle in a worktree, a reviewer reads the result. If the
+        # premise was wrong, all of that is spent before anyone can say so — and the
+        # architect has already rejected proposals on their premise, so a wrong premise
+        # reaching this point is not hypothetical.
+        #
+        # Gating create_pr alone was too late: that stops the OUTPUT of work already paid
+        # for. This stops the work itself, at the one point where saying no is still cheap.
+        #
+        # Enabled by listing "assign_task" in safety.human_approval_required. Left out,
+        # nothing changes and the architect dispatches as before.
+        if (
+            envelope.message_type == MessageType.TASK_ASSIGNMENT
+            and self.safety.needs_approval("assign_task")
+        ):
+            files = list(payload.get("files_to_modify", [])) + list(payload.get("files_to_create", []))
+            ctx = build_gate_context(
+                operation="assign_task",
+                branch=payload.get("branch_name") or None,
+                files=self.safety.classify_files(files) if files else [],
+                file_count=len(files),
+                safety_summary="awaiting approval before any work starts",
+                extra={
+                    "approach": payload.get("approach", ""),
+                    "acceptance_criteria": payload.get("acceptance_criteria", []),
+                    "testing_strategy": payload.get("testing_strategy", ""),
+                },
+            )
+            approved = await self._request_human_approval(
+                action="assign_task",
+                reason=(payload.get("approach", "") or "task assignment").split("\n")[0],
+                context=ctx,
+                thread_id=envelope.thread_id,
+            )
+            if not approved:
+                logger.info(
+                    "Agent %s: task assignment on thread %s not approved — no work dispatched",
+                    self.agent_id, envelope.thread_id[:8],
+                )
+                return False
+
         # Check branch names (skip None/empty/"None")
         branch = payload.get("branch_name")
         if branch and branch != "None":
@@ -838,7 +881,7 @@ class AgentProcess(ABC):
 
         payload = {
             "direction": direction,
-            "content": content[:5000],
+            "content": content,
             "content_length": len(content),
             "content_preview": content[:200],
         }
@@ -1113,7 +1156,7 @@ class DeliberatingAgent(AgentProcess):
 
         payload = {
             "direction": direction,
-            "content": content[:5000],
+            "content": content,
             "content_length": len(content),
             "content_preview": content[:200],
         }

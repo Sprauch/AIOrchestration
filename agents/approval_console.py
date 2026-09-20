@@ -118,7 +118,7 @@ class HumanApprovalConsole:
         if (fc := context.get("file_count")) is not None:
             lines.append(f"  File count:  {fc}")
         if files := context.get("files"):
-            for f in files[:10]:
+            for f in files:
                 flag = " [PROTECTED]" if f.get("protected") else ""
                 lines.append(f"    - {f.get('path', '?')}{flag}")
             if len(files) > 10:

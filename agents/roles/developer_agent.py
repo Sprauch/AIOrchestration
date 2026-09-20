@@ -66,8 +66,12 @@ class DeveloperAgent(AgentProcess):
         for msg in messages:
             mt = msg.get("message_type")
             p = msg.get("payload", {})
-            tid = msg.get("thread_id") or source_envelope.thread_id
-            branch = str(p.get("branch_name") or branch_fallback or "")[:80]
+            # The SOURCE envelope decides the thread, not the model. A downstream
+            # message always continues the thread it is answering, and a model-supplied
+            # id can only be an echo of what it was given or a hallucination - the first
+            # adds nothing, the second silently moves work onto another thread.
+            tid = source_envelope.thread_id
+            branch = str(p.get("branch_name") or branch_fallback or "")
 
             if mt == "task_progress":
                 envelopes.append(Envelope(
@@ -75,10 +79,10 @@ class DeveloperAgent(AgentProcess):
                     sender_role=self.role,
                     message_type=MessageType.TASK_PROGRESS,
                     payload={
-                        "status": str(p.get("status", "completed"))[:20],
+                        "status": str(p.get("status", "completed")),
                         "branch_name": branch,
-                        "changes_summary": str(p.get("changes_summary", ""))[:300],
-                        "files_changed": [str(f)[:100] for f in p.get("files_changed", [])[:10]],
+                        "changes_summary": str(p.get("changes_summary", "")),
+                        "files_changed": [str(f) for f in p.get("files_changed", [])[:10]],
                     },
                     thread_id=tid,
                 ))
@@ -90,10 +94,10 @@ class DeveloperAgent(AgentProcess):
                     message_type=MessageType.REVIEW_REQUEST,
                     payload={
                         "branch_name": branch,
-                        "files_changed": [str(f)[:100] for f in p.get("files_changed", [])[:10]],
+                        "files_changed": [str(f) for f in p.get("files_changed", [])[:10]],
                         "tests_passed": bool(p.get("tests_passed", False)),
-                        "tests_added": [str(t)[:100] for t in p.get("tests_added", [])[:10]],
-                        "notes": str(p.get("notes", ""))[:300],
+                        "tests_added": [str(t) for t in p.get("tests_added", [])[:10]],
+                        "notes": str(p.get("notes", "")),
                     },
                     thread_id=tid,
                     recipient_role="reviewer",

@@ -145,7 +145,7 @@ def build_gate_context(
     if branch is not None:
         ctx["branch"] = branch
     if files is not None:
-        ctx["files"] = files[:20]  # cap to avoid huge payloads
+        ctx["files"] = files  # a human approving a change must see every file in it
     if file_count is not None:
         ctx["file_count"] = file_count
     if extra:
