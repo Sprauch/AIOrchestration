@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 from agents.core.config import OrchestratorConfig
+from agents.core.cli_session import resolve_cli
 
 logger = logging.getLogger(__name__)
 
@@ -103,8 +104,12 @@ def _probe_cli(cli: str) -> tuple[bool, str]:
     """
     version_flag = "--version"
     try:
+        # resolve_cli, not the bare name. On Windows these install as .CMD shims that
+        # CreateProcess cannot execute by name, so a bare probe reports "not found" for a
+        # CLI that is installed and working. The agents use the same resolver, so a green
+        # preflight now means the exact command the agents will run.
         result = subprocess.run(
-            [cli, version_flag],
+            [resolve_cli(cli), version_flag],
             capture_output=True, text=True, timeout=15,
         )
         if result.returncode == 0:

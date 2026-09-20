@@ -5,12 +5,34 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import shutil
 import tempfile
 import uuid
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=8)
+def resolve_cli(name: str) -> str:
+    """Resolve a CLI name to a full path, because Windows cannot execute a bare shim.
+
+    Both `claude` and `codex` install as npm shims. On Windows that means `claude.CMD`,
+    and CreateProcess - which is what subprocess and asyncio use without a shell - cannot
+    run a .CMD by bare name. Measured:
+
+        ["claude", "--version"]                -> FileNotFoundError [WinError 2]
+        [shutil.which("claude"), "--version"]  -> exit 0, "2.1.278 (Claude Code)"
+
+    shutil.which honours PATHEXT, finds the .CMD and returns a path CreateProcess accepts.
+    On POSIX it resolves the same name and nothing changes.
+
+    Falls back to the bare name so the caller still raises its own error rather than
+    failing on a None.
+    """
+    return shutil.which(name) or name
 
 
 class CLISession(ABC):
@@ -167,7 +189,7 @@ class ClaudeSession(CLISession):
         return self._extract_response(stdout.decode())
 
     def _build_command(self) -> list[str]:
-        cmd = ["claude", "--print", "--verbose", "--output-format", "stream-json"]
+        cmd = [resolve_cli("claude"), "--print", "--verbose", "--output-format", "stream-json"]
 
         if self.resume_conversation and self._turn_count > 0:
             cmd += ["--resume", self.session_id]
@@ -337,7 +359,7 @@ class CodexSession(CLISession):
     def _build_command(self) -> list[str]:
         """Build the Codex CLI command for one non-interactive turn."""
         mode = self.mode or "exec"
-        cmd = ["codex", mode]
+        cmd = [resolve_cli("codex"), mode]
         overrides = dict(self.config_overrides)
         if mode != "exec" and self.model and "model" not in overrides:
             overrides["model"] = self.model
