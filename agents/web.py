@@ -1115,6 +1115,22 @@ class WebDashboard:
         invalid with credentials. This is not opening the dashboard to other sites - it
         is letting the dashboard talk to itself.
         """
+        # Request log to a file. A browser on another device cannot show you its console,
+        # so without this the only evidence of a failure is the word the UI managed to
+        # print. Records method, path, origin and whether an Authorization header was
+        # present - never the token itself.
+        try:
+            with open(Path(__file__).resolve().parent / "logs" / "dashboard-requests.log", "a",
+                      encoding="utf-8") as fh:
+                fh.write("{} {} {} origin={!r} auth={} ua={!r}\n".format(
+                    time.strftime("%H:%M:%S"), request.method, request.path,
+                    request.headers.get("Origin", ""),
+                    "yes" if request.headers.get("Authorization") else "no",
+                    request.headers.get("User-Agent", "")[:60],
+                ))
+        except OSError:
+            pass
+
         if request.method == "OPTIONS":
             return web.Response(status=204, headers=self._cors_headers(request))
         response = await handler(request)

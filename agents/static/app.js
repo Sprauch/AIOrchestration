@@ -1029,7 +1029,7 @@ async function refreshExceptions(){
 
   }catch(e){console.error(e);}
 }
-async function gateAction(id,action){const h={method:'POST'};const tok=localStorage.getItem('gate_token');if(tok)h.headers={'Authorization':'Bearer '+tok};const r=await fetch('/api/gates/'+id+'/'+action,h);if(r.status===401){const t=prompt('Gate token required:');if(t){localStorage.setItem('gate_token',t);return gateAction(id,action);}}refreshExceptions();refreshOverview();}
+async function gateAction(id,action){const h={method:'POST'};const hdrs=authHeaders();if(hdrs)h.headers=hdrs;const r=await fetch('/api/gates/'+id+'/'+action,h);if(r.status===401){const t=prompt('Gate token required:');if(t){localStorage.setItem('gate_token',t);return gateAction(id,action);}}refreshExceptions();refreshOverview();}
 
 // ── Orchestrator control ──
 // Follows the same token pattern as gateAction: stored in localStorage, prompted for on
@@ -1042,13 +1042,13 @@ async function startOrchestrator(){
   say('');
   try{
     const h={method:'POST'};
-    const tok=localStorage.getItem('gate_token');
-    if(tok)h.headers={'Authorization':'Bearer '+tok};
+    const hdrs=authHeaders();
+    if(hdrs)h.headers=hdrs;
     const r=await fetch('/api/orchestrator/start',h);
     if(r.status===401){
-      const t=prompt('Dashboard token required to start the orchestrator:');
-      if(t){localStorage.setItem('gate_token',t);return startOrchestrator();}
-      say('cancelled');
+      const t=prompt('Dashboard token required. Run  .\\AIO.ps1 pair  and paste the token:');
+      if(t&&isValidToken(t.trim())){localStorage.setItem('gate_token',t.trim());return startOrchestrator();}
+      say(t?'that is not a valid token (expected 64 hex characters)':'cancelled');
       if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
       return;
     }
@@ -1078,8 +1078,8 @@ async function startOrchestrator(){
 }
 
 // ── Thread actions ──
-async function resetCycles(tid){try{const h={method:'POST'};const tok=localStorage.getItem('gate_token');if(tok)h.headers={'Authorization':'Bearer '+tok};const r=await fetch('/api/threads/'+tid+'/reset-cycles',h);if(r.status===401){const t=prompt('Gate token required:');if(t){localStorage.setItem('gate_token',t);return resetCycles(tid);}}if(!r.ok){const b=await r.text();console.error('resetCycles failed:',r.status,b);alert('Reset failed: '+r.status);}else{refreshExceptions();refreshOverview();}}catch(e){console.error('resetCycles error:',e);alert('Reset error: '+e.message);}}
-async function abandonThread(tid){if(!confirm('Abandon this thread? It will be marked as skipped permanently.'))return;try{const h={method:'POST'};const tok=localStorage.getItem('gate_token');if(tok)h.headers={'Authorization':'Bearer '+tok};const r=await fetch('/api/threads/'+tid+'/abandon',h);if(r.status===401){const t=prompt('Gate token required:');if(t){localStorage.setItem('gate_token',t);return abandonThread(tid);}}if(!r.ok){alert('Abandon failed: '+r.status);}else{refreshExceptions();refreshOverview();}}catch(e){alert('Abandon error: '+e.message);}}
+async function resetCycles(tid){try{const h={method:'POST'};const hdrs=authHeaders();if(hdrs)h.headers=hdrs;const r=await fetch('/api/threads/'+tid+'/reset-cycles',h);if(r.status===401){const t=prompt('Gate token required:');if(t){localStorage.setItem('gate_token',t);return resetCycles(tid);}}if(!r.ok){const b=await r.text();console.error('resetCycles failed:',r.status,b);alert('Reset failed: '+r.status);}else{refreshExceptions();refreshOverview();}}catch(e){console.error('resetCycles error:',e);alert('Reset error: '+e.message);}}
+async function abandonThread(tid){if(!confirm('Abandon this thread? It will be marked as skipped permanently.'))return;try{const h={method:'POST'};const hdrs=authHeaders();if(hdrs)h.headers=hdrs;const r=await fetch('/api/threads/'+tid+'/abandon',h);if(r.status===401){const t=prompt('Gate token required:');if(t){localStorage.setItem('gate_token',t);return abandonThread(tid);}}if(!r.ok){alert('Abandon failed: '+r.status);}else{refreshExceptions();refreshOverview();}}catch(e){alert('Abandon error: '+e.message);}}
 
 // ── Agent pause/resume ──
 async function pauseAgent(id){await fetch('/api/agents/'+id+'/pause',{method:'POST'});refreshOverview();}
@@ -1288,11 +1288,32 @@ document.addEventListener('keydown',function(e){
 // Stripping matters: a token left in the address bar reaches browser history, travels
 // when someone copies the URL, and can appear in a Referer header later. replaceState
 // rather than pushState means Back does not restore it either.
+// A token is 64 hex characters. Anything else is a copy-paste accident - most often a URL
+// abbreviated with an ellipsis in a chat message, which stores the literal character.
+// That matters more than it sounds: a header value outside Latin-1 makes fetch throw a
+// bare TypeError BEFORE any request is sent, so the failure looks like a network problem
+// and nothing reaches the server to explain it.
+function isValidToken(t){ return typeof t==='string' && /^[0-9a-fA-F]{32,128}$/.test(t); }
+
+// Returns auth headers, or null if the stored token is unusable. Clears a bad one so the
+// next call prompts instead of failing the same way forever.
+function authHeaders(){
+  const t=localStorage.getItem('gate_token');
+  if(!t)return null;
+  if(!isValidToken(t)){localStorage.removeItem('gate_token');return null;}
+  return {'Authorization':'Bearer '+t};
+}
+
 (function pairFromUrl(){
   try{
     const u=new URL(window.location.href);
     const t=u.searchParams.get('token');
     if(!t)return;
+    if(!isValidToken(t)){
+      console.warn('Ignoring an invalid token in the URL:',JSON.stringify(t));
+      alert('That pairing link has a placeholder instead of a real token.\n\nRun  .\\AIO.ps1 pair  and use the link it copies to the clipboard.');
+      return;
+    }
     localStorage.setItem('gate_token',t);
     u.searchParams.delete('token');
     window.history.replaceState({},document.title,u.pathname+(u.search||'')+u.hash);
