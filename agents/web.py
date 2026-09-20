@@ -59,7 +59,7 @@ class WebDashboard:
     async def start(self) -> None:
         await self.bus.connect()
 
-        app = web.Application()
+        app = web.Application(middlewares=[self._private_network_middleware])
 
         # API routes
         app.router.add_get("/api/snapshot", self._handle_snapshot)
@@ -1092,6 +1092,52 @@ class WebDashboard:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return None
+
+    @web.middleware
+    async def _private_network_middleware(self, request: web.Request, handler):
+        """Answer CORS preflights, including Chrome's Private Network Access check.
+
+        WHY THIS IS NEEDED FOR A SAME-ORIGIN REQUEST. When the dashboard is reached over
+        plain HTTP at a private address - a phone on a Tailscale or LAN address - Chrome
+        treats the insecure page as "public" address space and the request to a 100.x or
+        192.168.x host as a private-network request. It then sends an OPTIONS preflight
+        carrying `Access-Control-Request-Private-Network: true`, even though the page and
+        the API share an origin.
+
+        aiohttp has no OPTIONS route, so that preflight was answered 405, the browser
+        discarded the real request, and `fetch` rejected with a bare TypeError. From a
+        phone the button simply reported "failed: type error" with nothing else to go on,
+        while every test from localhost passed - loopback is not a private-network
+        request, so the preflight never happened there.
+
+        The response is deliberately narrow: it echoes the requesting origin rather than
+        using a wildcard, because `Authorization` is a credentialed header and `*` is
+        invalid with credentials. This is not opening the dashboard to other sites - it
+        is letting the dashboard talk to itself.
+        """
+        if request.method == "OPTIONS":
+            return web.Response(status=204, headers=self._cors_headers(request))
+        response = await handler(request)
+        for k, v in self._cors_headers(request).items():
+            response.headers.setdefault(k, v)
+        return response
+
+    @staticmethod
+    def _cors_headers(request: web.Request) -> dict[str, str]:
+        origin = request.headers.get("Origin", "")
+        headers = {
+            "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type",
+            "Access-Control-Max-Age": "600",
+            # The Private Network Access opt-in. Without it Chrome fails the preflight
+            # even when everything else is correct.
+            "Access-Control-Allow-Private-Network": "true",
+        }
+        if origin:
+            headers["Access-Control-Allow-Origin"] = origin
+            headers["Access-Control-Allow-Credentials"] = "true"
+            headers["Vary"] = "Origin"
+        return headers
 
     async def _handle_orchestrator_status(self, request: web.Request) -> web.Response:
         """Is one running, and may this caller start one?
