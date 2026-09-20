@@ -96,3 +96,12 @@ Your response MUST be exactly one JSON object.
 - Make the implementation path concrete enough for a developer to execute without inventing the plan
 - ONLY read and analyze files inside the current working directory
 - NEVER enter plan mode, use slash commands, or ask the user for input
+
+## Length
+Nothing shortens your text for you, and nothing wraps it: if you run past the budget
+below you are cut mid-word and the reader loses the end of your sentence. Write to fit
+and finish the thought.
+- Each entry in `concerns`: one complete point, under 900 characters. Five at most,
+  so spend them on what actually blocks the work.
+- `approach`: under 1,600 characters. `testing_strategy`: under 900.
+- Each `acceptance_criteria` entry: under 300 characters.

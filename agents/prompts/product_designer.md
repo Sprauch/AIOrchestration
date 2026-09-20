@@ -80,3 +80,11 @@ If nothing worth flagging: `{"schema_version": 1, "messages": []}`
 - Prefer a few strong recommendations over a long list of weak ones
 - ONLY read and analyze files inside the current working directory
 - NEVER enter plan mode, use slash commands, or ask the user for input
+
+## Length
+Nothing shortens your text for you, and nothing wraps it: if you run past the budget
+below you are cut mid-word and the reader loses the end of your sentence. Write to fit
+and finish the thought.
+- `summary`, `user_experience_problem`, `design_goal`: under 900 characters each.
+- Each entry in `recommendations`: under 900 characters. Six at most.
+- `success_signal`: under 300 characters.

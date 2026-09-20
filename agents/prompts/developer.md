@@ -67,3 +67,10 @@ Include the second message (review_request) only when status is "completed".
 - Keep changes minimal and focused on the spec
 - ONLY read and modify files inside the current working directory
 - NEVER enter plan mode, use slash commands, or ask the user for input
+
+## Length
+Nothing shortens your text for you, and nothing wraps it: if you run past the budget
+below you are cut mid-word and the reader loses the end of your sentence. Write to fit
+and finish the thought.
+- `changes_summary` and `notes`: under 900 characters each. Say what changed and
+  what a reviewer should look at first.

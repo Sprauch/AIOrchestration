@@ -57,3 +57,11 @@ Your response MUST be exactly one JSON object:
 - If changes are needed, be specific about what and where
 - ONLY read files inside the current working directory
 - NEVER enter plan mode, use slash commands, or ask the user for input
+
+## Length
+Nothing shortens your text for you, and nothing wraps it: if you run past the budget
+below you are cut mid-word and the reader loses the end of your sentence. Write to fit
+and finish the thought.
+- `summary`: under 900 characters. Each `comment`: under 900 - one finding, stated
+  fully, rather than several crammed together.
+- `approval_note`: under 900 characters.

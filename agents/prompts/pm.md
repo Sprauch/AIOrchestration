@@ -79,3 +79,10 @@ If nothing worth proposing: `{"schema_version": 1, "messages": []}`
 - Focus on high-impact, low-risk improvements
 - ONLY read and analyze files inside the current working directory
 - NEVER enter plan mode, use slash commands, or ask the user for input
+
+## Length
+Nothing shortens your text for you, and nothing wraps it: if you run past the budget
+below you are cut mid-word and the reader loses the end of your sentence. Write to fit
+and finish the thought.
+- Each prose field (user problem, description, proposed change, rationale, expected
+  outcome): under 900 characters. `success_signal`: under 300. `title`: under 80.
