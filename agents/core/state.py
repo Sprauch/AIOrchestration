@@ -148,16 +148,57 @@ async def _query_snapshot(r: aioredis.Redis) -> SystemSnapshot:
 
 # ── Pipeline phase derivation ─────────────────────────────
 
-# Fixed pipeline phases in execution order.
-PIPELINE_PHASES = ["pm", "product_designer", "architect", "developer", "reviewer"]
+# THE CHAIN, IN EXECUTION ORDER, INCLUDING ROLES THAT DO NOT EXIST YET.
+#
+# Listing the full intended chain here rather than only what is wired up means a new role
+# appears in the right place the moment it is added, instead of needing the display to be
+# changed as well. A phase with no agent behind it simply never becomes active.
+#
+# DATA ENGINEER IS DELIBERATELY ABSENT, and that is a statement about the shape of the
+# chain rather than an oversight: it is A FORM OF DEVELOPER, not a stage of its own. It
+# differs in the context it is given - the data, the ETL - not in where it sits in the
+# pipeline. Future specialisations are expected on the same basis, and they all collapse
+# onto the developer step, via DEVELOPER_VARIANTS below.
+PIPELINE_PHASES = [
+    "pm",
+    "product_designer",
+    "architect",
+    "developer",
+    "tester",
+    "devops",
+    "tech_writer",
+    "retrospective",
+]
+
+# Roles that ARE developers, shown at the developer step rather than beside it.
+DEVELOPER_VARIANTS = {"data_engineer"}
 
 PHASE_LABELS = {
     "pm": "PM proposing",
-    "product_designer": "Product Designer reviewing",
+    "product_designer": "Designer reviewing",
     "architect": "Architect reviewing",
     "developer": "Developer implementing",
-    "reviewer": "Reviewer reviewing",
+    "tester": "Tester verifying",
+    "devops": "DevOps deploying",
+    "tech_writer": "Tech Writer recording",
+    "retrospective": "Retro reviewing the work",
 }
+
+# What the header shows. Short, because eight of them share one strip.
+PHASE_SHORT = {
+    "pm": "PM",
+    "product_designer": "Designer",
+    "architect": "Architect",
+    "developer": "Developer",
+    "tester": "Tester",
+    "devops": "DevOps",
+    "tech_writer": "TechWriter",
+    "retrospective": "Retro",
+}
+
+# The reviewer predates the tester and does the same job at the same point in the chain.
+# Mapped rather than renamed, so an existing deployment keeps working.
+ROLE_TO_PHASE = {"reviewer": "tester", **{v: "developer" for v in DEVELOPER_VARIANTS}}
 
 
 def derive_current_phase(
@@ -180,6 +221,7 @@ def derive_current_phase(
     for agent in agents:
         prefix = agent.agent_id.split("-")[0]  # "pm-1" -> "pm", "dev-1" -> "dev"
         r = _short_to_role.get(prefix, prefix)
+        r = ROLE_TO_PHASE.get(r, r)  # a variant shows at the step it belongs to
         if r in PIPELINE_PHASES and agent.status == "busy":
             active_roles.add(r)
 
@@ -191,13 +233,13 @@ def derive_current_phase(
             if isinstance(info, dict) and info.get("active", 0) > 0:
                 mapped_role = _bp_to_role.get(stage)
                 if mapped_role:
-                    active_roles.add(mapped_role)
+                    active_roles.add(ROLE_TO_PHASE.get(mapped_role, mapped_role))
 
     if not active_roles:
         return {
             "current_phase": None,
             "phases": [
-                {"name": p, "label": PHASE_LABELS[p], "state": "inactive"}
+                {"name": p, "label": PHASE_LABELS[p], "short": PHASE_SHORT[p], "state": "inactive"}
                 for p in PIPELINE_PHASES
             ],
         }
@@ -218,6 +260,6 @@ def derive_current_phase(
             state = "completed"
         else:
             state = "pending"
-        phases.append({"name": p, "label": PHASE_LABELS[p], "state": state})
+        phases.append({"name": p, "label": PHASE_LABELS[p], "short": PHASE_SHORT[p], "state": state})
 
     return {"current_phase": current, "phases": phases}

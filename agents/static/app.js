@@ -117,6 +117,7 @@ function formatReviewRequest(p) {
 const viewTitles = {overview:'Overview',work:'Work',exceptions:'Exceptions',system:'System'};
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>switchView(n.dataset.view)));
 function switchView(name) {
+  if(name==='work'&&typeof renderDecisionGates==='function')renderDecisionGates();
   // Auto-close thread detail overlay when switching views
   const overlay=document.getElementById('thread-overlay');
   if(overlay&&overlay.style.display!=='none')closeThreadDetail();
@@ -153,18 +154,23 @@ function renderPhaseIndicator(phaseData) {
   const container = document.getElementById('phase-indicator');
   if (!container || !phaseData) return;
   const phases = phaseData.phases || [];
-  const steps = container.querySelectorAll('.phase-step');
-  const connectors = container.querySelectorAll('.phase-connector');
-  steps.forEach((el, i) => {
-    const p = phases[i];
-    if (!p) return;
-    el.className = 'phase-step ' + (p.state || 'inactive');
-    el.title = p.label || '';
-  });
-  connectors.forEach((el, i) => {
-    const p = phases[i];
-    el.className = 'phase-connector' + (p && (p.state === 'completed' || p.state === 'active') ? ' done' : '');
-  });
+  if (!phases.length) return;
+  // BUILT FROM THE SERVER'S LIST. The markup used to hold four fixed steps and this
+  // function assigned state to them BY INDEX, so the step labelled "Architect" carried
+  // the Product Designer's state, "Developer" carried the Architect's, and the Reviewer
+  // was never drawn at all. Rendering what the server actually sent cannot drift, and
+  // the chain grows to eight without touching the page.
+  container.innerHTML = phases.map((p, i) => {
+    const connector = i > 0
+      ? '<div class="phase-connector' + ((p.state === 'completed' || p.state === 'active') ? ' done' : '') + '"></div>'
+      : '';
+    return connector
+      + '<div class="phase-step ' + (p.state || 'inactive') + '" data-phase="' + esc(p.name) + '"'
+      + ' title="' + esc(p.label || '') + '">'
+      + '<span class="phase-num">' + (i + 1) + '</span>'
+      + '<span class="phase-label">' + esc(p.short || p.name) + '</span>'
+      + '</div>';
+  }).join('');
 }
 
 // ── Error Summary Panel ──
@@ -1097,6 +1103,51 @@ async function gateAction(id,action){const h={method:'POST'};const hdrs=authHead
 // ── Orchestrator control ──
 // Follows the same token pattern as gateAction: stored in localStorage, prompted for on
 // 401, retried once. That means pairing a phone once works for approvals AND for this.
+// ── Decision gates ──
+// The rules already governed every run; they just were not stated anywhere a person
+// looks. Not knowing them produced exactly the alarm they exist to prevent — work
+// showing as "approved" with no approval given, because that word meant the architect's
+// decision and nothing said so.
+let _policyCache=null;
+async function renderDecisionGates(){
+  const el=document.getElementById('decision-gates');
+  if(!el)return;
+  if(!_policyCache){
+    try{ _policyCache=await (await fetch('/api/policy')).json(); }
+    catch(e){ return; }
+  }
+  const p=_policyCache;
+  if(!p||!p.available){el.innerHTML='';return;}
+
+  const gates=(p.gates||[]).map(g=>
+    '<div class="dg-item"><div class="dg-when">'+esc(g.when)+'</div>'
+    +'<div class="dg-why">'+esc(g.why)+'</div>'
+    +'<code class="dg-action">'+esc(g.action)+'</code></div>').join('');
+
+  const auto=(p.automatic||[]).map(a=>'<li>'+esc(a)+'</li>').join('');
+  const blocked=(p.blocked_outright||[]).map(f=>'<code>'+esc(f)+'</code>').join(' ');
+
+  const limits=[];
+  if(p.branch_prefix)limits.push('Agents may only commit to branches starting <code>'+esc(p.branch_prefix)+'</code>.');
+  if((p.never_push_to||[]).length)limits.push('Never pushed to: '+p.never_push_to.map(b=>'<code>'+esc(b)+'</code>').join(', ')+'.');
+  if(p.max_files_per_change)limits.push('A change touching more than '+p.max_files_per_change+' files escalates.');
+  if(p.gate_timeout_hours)limits.push('An unanswered gate expires after '+p.gate_timeout_hours+' h, and is then refused rather than allowed.');
+
+  el.innerHTML='<details class="dg-card" open><summary class="dg-head">'
+    +'<span class="dg-title">Decision Gates</span>'
+    +'<span class="dg-count">'+(p.gates||[]).length+' need your approval</span></summary>'
+    +'<div class="dg-body">'
+    +'<div class="dg-section-label">Stops and waits for you</div>'
+    +gates
+    +'<div class="dg-section-label">Happens without asking</div>'
+    +'<ul class="dg-auto">'+auto+'</ul>'
+    +(blocked?'<div class="dg-section-label">Refused outright, never offered for approval</div>'
+      +'<div class="dg-blocked">'+blocked+'</div>':'')
+    +(limits.length?'<div class="dg-section-label">Standing limits</div>'
+      +'<ul class="dg-auto">'+limits.map(l=>'<li>'+l+'</li>').join('')+'</ul>':'')
+    +'</div></details>';
+}
+
 // ── Orchestration mode ──
 // Which mode is in force decides ONE thing: whether the PM agent proposes work.
 // Available whether or not the orchestrator is running — Redis holds the setting, and

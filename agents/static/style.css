@@ -1391,3 +1391,72 @@ tr.click { cursor: pointer; }
   .pf-card { padding: 14px; }
   .brief-action { flex-wrap: wrap; gap: 8px; }
 }
+
+/* ── Two-row header ─────────────────────────────────────────────────────────
+   The chain is eight steps. On one row it either overflows or squeezes the tabs
+   out of reach — the failure reported from a phone, when it was only four. The
+   phase strip gets a row of its own below the nav, full width, so it can grow
+   without competing with navigation for space. */
+.topnav {
+  height: auto;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  row-gap: 6px;
+}
+.topnav .phase-indicator {
+  order: 10;            /* after everything else: its own row */
+  flex-basis: 100%;
+  margin-left: 0;
+  margin-right: 0;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  row-gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+}
+/* The strip is always shown now. It was hidden below 900px because it competed with
+   the tabs on one row; on its own row there is nothing to compete with. */
+@media (max-width: 900px) {
+  .topnav .phase-indicator { display: flex; }
+}
+@media (max-width: 560px) {
+  .topnav { padding-left: 12px; padding-right: 12px; }
+  .topnav .phase-indicator .phase-label { display: none; }  /* numbers still carry order */
+  .topnav .phase-indicator .phase-step { padding-left: 4px; padding-right: 4px; }
+}
+
+/* ── Decision gates ─────────────────────────────────────────────────────── */
+.dg-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; margin-bottom: 18px; overflow: hidden;
+}
+.dg-head {
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  padding: 12px 16px; list-style: none;
+}
+.dg-head::-webkit-details-marker { display: none; }
+.dg-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.dg-count { font-size: 11px; color: var(--dim); margin-left: auto; }
+.dg-body { padding: 0 16px 16px; }
+.dg-section-label {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--subtle); margin: 14px 0 8px;
+}
+.dg-item {
+  border-left: 2px solid var(--yellow); padding: 2px 0 2px 12px; margin-bottom: 10px;
+}
+.dg-when { font-size: 13px; font-weight: 600; }
+.dg-why { font-size: 12px; color: var(--dim); line-height: 1.5; margin-top: 2px; }
+.dg-action {
+  font-family: var(--mono); font-size: 10.5px; color: var(--subtle);
+  background: var(--bg); padding: 1px 5px; border-radius: 3px;
+  display: inline-block; margin-top: 4px;
+}
+.dg-auto { margin: 0; padding-left: 18px; }
+.dg-auto li { font-size: 12px; color: var(--dim); line-height: 1.7; }
+.dg-auto code, .dg-blocked code {
+  font-family: var(--mono); font-size: 10.5px;
+  background: var(--bg); padding: 1px 5px; border-radius: 3px;
+}
+.dg-blocked { display: flex; flex-wrap: wrap; gap: 5px; }

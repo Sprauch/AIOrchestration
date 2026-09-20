@@ -30,15 +30,10 @@
       <span class="nav-label">System</span>
     </div>
   </div>
-  <div class="phase-indicator" id="phase-indicator">
-    <div class="phase-step inactive" data-phase="pm"><span class="phase-num">1</span><span class="phase-label">PM</span></div>
-    <div class="phase-connector"></div>
-    <div class="phase-step inactive" data-phase="architect"><span class="phase-num">2</span><span class="phase-label">Architect</span></div>
-    <div class="phase-connector"></div>
-    <div class="phase-step inactive" data-phase="developer"><span class="phase-num">3</span><span class="phase-label">Developer</span></div>
-    <div class="phase-connector"></div>
-    <div class="phase-step inactive" data-phase="reviewer"><span class="phase-num">4</span><span class="phase-label">Reviewer</span></div>
-  </div>
+  <!-- Built from the server's phase list, never hardcoded. It used to be four fixed steps
+       filled in BY INDEX, so once a fifth role existed every step after the first showed
+       a different role's state than its label — and the chain is going to eight. -->
+  <div class="phase-indicator" id="phase-indicator"></div>
   <div class="topnav-right">
     <div class="status-dot" id="sb-dot"></div>
     <span id="sb-status">Connecting...</span>
@@ -104,6 +99,9 @@
     <!-- WORK -->
     <div class="view" id="view-work">
       <p class="view-desc">Each thread is one improvement flowing through the pipeline. A thread may go through multiple proposal rounds before shipping.</p>
+      <!-- What stops for you and what does not. Stated here because these rules governed
+           every run already but existed only as lines in a config file. -->
+      <div id="decision-gates"></div>
       <div class="work-header">
         <div class="work-filters" id="work-filters">
           <button class="filter-btn active" data-filter="all">All</button>

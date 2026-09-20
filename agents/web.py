@@ -50,7 +50,8 @@ class WebDashboard:
     def __init__(self, redis_url: str, port: int = 8081, gate_token: str | None = None,
                  idle_threshold: int = 600, max_change_rounds: int = 3, stream_read_limit: int = 500,
                  max_pending_proposals: int = 3, max_pending_tasks: int = 3, max_pending_reviews: int = 5,
-                 weekly_token_budget: int = 0, weekly_token_basis: str = "both"):
+                 weekly_token_budget: int = 0, weekly_token_basis: str = "both",
+                 safety=None, gate_timeout: int = 0):
         self.redis_url = redis_url
         self.port = port
         self.gate_token = gate_token
@@ -63,6 +64,8 @@ class WebDashboard:
             "tasks": max_pending_tasks,
             "reviews": max_pending_reviews,
         }
+        self.safety = safety
+        self._gate_timeout_hours = gate_timeout / 3600 if gate_timeout else 0
         self.weekly_token_budget = weekly_token_budget
         self.weekly_token_basis = weekly_token_basis
         self.bus = MessageBus(redis_url)
@@ -79,6 +82,7 @@ class WebDashboard:
         app.router.add_get("/api/threads/{thread_id}", self._handle_thread_detail)
         app.router.add_get("/api/agents/{agent_id}", self._handle_agent_detail)
         app.router.add_get("/api/streams/{stream_name}", self._handle_stream_messages)
+        app.router.add_get("/api/policy", self._handle_policy)
         app.router.add_get("/api/mode", self._handle_mode_get)
         app.router.add_post("/api/mode", self._handle_mode_set)
         app.router.add_post("/api/proposals", self._handle_submit_proposal)
@@ -1243,6 +1247,83 @@ class WebDashboard:
             headers["Vary"] = "Origin"
         return headers
 
+
+
+    # ── Decision gates ─────────────────────────────────────
+
+    # What stops on its own, and what stops for you. These rules already governed every
+    # run, but only as lines in a config file nobody reads mid-flight — and not knowing
+    # them produced exactly the alarm it should have prevented: work marked "approved"
+    # with no approval given, because "approved" there meant the architect's decision and
+    # nothing in the interface said so.
+    _GATE_DESCRIPTIONS = {
+        "assign_task": (
+            "Before any work starts",
+            "The architect has accepted a proposal and written a task. Nothing is built, "
+            "no branch is created and no developer is given it until you approve. This is "
+            "the cheap place to say no — refusing later means the work was already paid for.",
+        ),
+        "create_pr": (
+            "Before a pull request is opened",
+            "The work is done, committed on an agent/ branch and reviewed. Opening the PR "
+            "is the first step that leaves this machine.",
+        ),
+        "delete_files": (
+            "Before any file is deleted",
+            "Deletion is not reversible by the pipeline that did it.",
+        ),
+        "modify_database": (
+            "Before a database is modified",
+            "Schema and data changes outlive the branch they were made on.",
+        ),
+        "push_to_remote": (
+            "Before a branch is pushed",
+            "Pushing publishes work to a remote others can see.",
+        ),
+        "large_change": (
+            "When a change touches more files than the limit",
+            "A change that spreads further than expected is usually a change that was "
+            "understood differently by whoever proposed it.",
+        ),
+        "protected_file": (
+            "Before a protected file is touched",
+            "Only in dogfood mode; elsewhere a protected file is refused outright.",
+        ),
+    }
+
+    async def _handle_policy(self, request: web.Request) -> web.Response:
+        """The decision rules in force, so the interface can state them rather than imply them."""
+        s = self.safety
+        if s is None:
+            return web.json_response({"available": False})
+
+        required = list(getattr(s, "human_approval_required", []) or [])
+        gates = []
+        for action in required:
+            when, why = self._GATE_DESCRIPTIONS.get(
+                action, (action.replace("_", " "), "Requires approval before it happens."),
+            )
+            gates.append({"action": action, "when": when, "why": why})
+
+        # Everything below happens WITHOUT asking, which is as important to state: a
+        # reader who knows only what is gated cannot tell what is not.
+        automatic = [
+            "Reading the codebase, at every stage.",
+            "Proposals, design feedback and technical review — these produce opinions, not changes.",
+            "Committing to an agent/ branch inside an isolated worktree.",
+            "Status and progress messages between agents.",
+        ]
+
+        return web.json_response({
+            "available": True,
+            "gates": gates,
+            "automatic": automatic,
+            "blocked_outright": list(getattr(s, "protected_files", []) or []),
+            "never_push_to": list(getattr(s, "never_push_to", []) or []),
+            "branch_prefix": getattr(s, "branch_prefix", ""),
+            "max_files_per_change": getattr(s, "max_files_per_change", None),
+            "gate_timeout_hours": round(self._gate_timeout_hours, 1) if self._gate_timeout_hours else None,
+        })
 
     # ── Orchestration mode ─────────────────────────────────
 

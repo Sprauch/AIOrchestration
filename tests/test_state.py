@@ -65,10 +65,13 @@ def test_phase_idle_no_agents():
     result = derive_current_phase([], None)
     assert result["current_phase"] is None
     assert all(p["state"] == "inactive" for p in result["phases"])
-    # Five phases, not the upstream four: product_designer runs between pm and
-    # architect. Named rather than counted so a change says which phase moved.
+    # The FULL intended chain, including roles not yet wired up: listing them here means
+    # a new role appears in the right place when it arrives rather than needing the
+    # display changed too. data_engineer is absent on purpose — it is a form of
+    # developer and shows at the developer step.
     assert [p["name"] for p in result["phases"]] == [
-        "pm", "product_designer", "architect", "developer", "reviewer",
+        "pm", "product_designer", "architect", "developer",
+        "tester", "devops", "tech_writer", "retrospective",
     ]
 
 
@@ -86,7 +89,7 @@ def test_phase_pm_busy():
     assert phases["pm"] == "active"
     assert phases["architect"] == "pending"
     assert phases["developer"] == "pending"
-    assert phases["reviewer"] == "pending"
+    assert phases["tester"] == "pending"
 
 
 def test_phase_developer_from_backpressure():
@@ -98,7 +101,7 @@ def test_phase_developer_from_backpressure():
     assert phases["pm"] == "completed"
     assert phases["architect"] == "completed"
     assert phases["developer"] == "active"
-    assert phases["reviewer"] == "pending"
+    assert phases["tester"] == "pending"
 
 
 def test_phase_multi_active_highest_wins():
@@ -109,19 +112,19 @@ def test_phase_multi_active_highest_wins():
         AgentState("reviewer-1", "busy", None, ""),
     ]
     result = derive_current_phase(agents, None)
-    assert result["current_phase"] == "reviewer"
+    assert result["current_phase"] == "tester"
     phases = {p["name"]: p["state"] for p in result["phases"]}
     assert phases["pm"] == "active"
     assert phases["architect"] == "completed"
     assert phases["developer"] == "active"
-    assert phases["reviewer"] == "active"
+    assert phases["tester"] == "active"
 
 
 def test_phase_reviewer_from_backpressure():
     agents = []
     bp = {"proposals": {"active": 0, "limit": 3}, "tasks": {"active": 0, "limit": 3}, "reviews": {"active": 1, "limit": 5}}
     result = derive_current_phase(agents, bp)
-    assert result["current_phase"] == "reviewer"
+    assert result["current_phase"] == "tester"
 
 
 def test_phase_short_id_arch():
@@ -146,9 +149,9 @@ def test_phase_short_id_rev():
     """Short-form 'rev-1' maps to reviewer phase."""
     agents = [AgentState("rev-1", "busy", None, "reviewing")]
     result = derive_current_phase(agents, None)
-    assert result["current_phase"] == "reviewer"
+    assert result["current_phase"] == "tester"
     phases = {p["name"]: p["state"] for p in result["phases"]}
-    assert phases["reviewer"] == "active"
+    assert phases["tester"] == "active"
 
 
 def test_phase_mixed_short_and_long_ids():
@@ -158,10 +161,10 @@ def test_phase_mixed_short_and_long_ids():
         AgentState("reviewer-1", "busy", None, ""),
     ]
     result = derive_current_phase(agents, None)
-    assert result["current_phase"] == "reviewer"
+    assert result["current_phase"] == "tester"
     phases = {p["name"]: p["state"] for p in result["phases"]}
     assert phases["developer"] == "active"
-    assert phases["reviewer"] == "active"
+    assert phases["tester"] == "active"
 
 
 def test_phase_labels_present():
@@ -170,3 +173,28 @@ def test_phase_labels_present():
     for p in result["phases"]:
         assert "label" in p
         assert len(p["label"]) > 0
+
+
+def test_data_engineer_shows_at_the_developer_step():
+    """A developer variant is not a phase of its own.
+
+    The data engineer differs from the developer in the CONTEXT it is given — the data,
+    the ETL — not in where it sits in the chain. Giving it its own step would imply the
+    work passes through it on the way somewhere, which it does not. Future
+    specialisations are expected to arrive on the same basis.
+    """
+    agents = [AgentState("data_engineer-1", "busy", None, "regenerating")]
+    result = derive_current_phase(agents, None)
+    assert result["current_phase"] == "developer"
+    names = [p["name"] for p in result["phases"]]
+    assert "data_engineer" not in names
+
+
+def test_every_phase_carries_a_short_label_for_the_header():
+    """Eight steps share one strip, so each needs a name that fits it."""
+    result = derive_current_phase([], None)
+    shorts = [p["short"] for p in result["phases"]]
+    assert shorts == [
+        "PM", "Designer", "Architect", "Developer",
+        "Tester", "DevOps", "TechWriter", "Retro",
+    ]
