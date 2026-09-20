@@ -141,6 +141,8 @@ def cmd_web(args: argparse.Namespace) -> None:
         max_pending_proposals=config.system.max_pending_proposals,
         max_pending_tasks=config.system.max_pending_tasks,
         max_pending_reviews=config.system.max_pending_reviews,
+        weekly_token_budget=config.system.weekly_token_budget,
+        weekly_token_basis=config.system.weekly_token_basis,
     )
     asyncio.run(dashboard.start())
 

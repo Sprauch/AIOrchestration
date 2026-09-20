@@ -146,6 +146,17 @@ class SystemConfig(BaseSettings):
     analysis_context: str = ""  # optional context prepended to startup triggers
     dogfood_mode: bool = False  # explicit opt-in for self-analysis behavior
     worktree_setup: WorktreeSetupConfig | None = None  # see WorktreeSetupConfig
+    # Your plan's weekly allowance in TOKENS, so the dashboard can show usage as a
+    # percentage rather than an amount. On a subscription a dollar figure means little -
+    # "$1.21" answers a question nobody asked - while "6% of this week" is a reference
+    # point you can act on, and tokens are the unit the plan is actually measured in.
+    #
+    # Take the number from the Claude Code plan page; nothing in the CLI exposes it.
+    # 0 disables the percentage and leaves the plain counts.
+    weekly_token_budget: int = 0
+    # Which tokens count toward that budget: "output", "input", or "both". Defaults to
+    # both because that is the conservative reading; change it if the plan counts one.
+    weekly_token_basis: str = "both"
 
     # working_dir existence is checked by preflight, not at config parse time.
     # This allows config to be loaded before the target directory is mounted

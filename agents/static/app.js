@@ -383,7 +383,32 @@ async function refreshOverview() {
       '<div class="otile c-green"><div class="ot-label">Completed</div><div class="ot-value">'+completed+'</div><div class="ot-sub">'+(mt['prs:created']||0)+' PRs created</div></div>',
       '<div class="otile c-amber"><div class="ot-label">In Progress</div><div class="ot-value">'+healthy+'</div><div class="ot-sub">'+threads.length+' total threads</div></div>',
       '<div class="otile '+(blocked?'c-red':'c-green')+'"><div class="ot-label">Blocked</div><div class="ot-value">'+blocked+'</div><div class="ot-sub">'+(blocked?blocked+' need attention':'All clear')+'</div></div>',
-      '<div class="otile c-blue"><div class="ot-label">Spend</div><div class="ot-value">'+(costStr||'—')+'</div><div class="ot-sub">'+snap.agents.length+' agents</div></div>',
+      // Both figures, because they answer different questions. The dollar amount is the
+      // API-rate equivalent and is real but abstract on a subscription; the percentage
+      // of the weekly allowance is the one you act on. Percentage leads.
+      (function(){
+        const w=snap.weekly||{};
+        const fmtT=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?Math.round(n/1e3)+'k':String(n||0);
+        const rows=[];
+        rows.push('<div class="ot-row"><span>API rate</span><b>'+(costStr||'—')+'</b></div>');
+        rows.push('<div class="ot-row"><span>Tokens</span><b>'+fmtT(w.used||0)+'</b></div>');
+        if(w.budget){
+          rows.push('<div class="ot-row"><span>Weekly allowance</span><b>'+fmtT(w.budget)+'</b></div>');
+        }
+        if(w.budget){
+          const pct=w.pct||0;
+          const tone=pct>=90?'c-red':pct>=70?'c-amber':'c-blue';
+          return '<div class="otile '+tone+'"><div class="ot-label">Consumption this week</div>'
+            +'<div class="ot-value">'+pct+'%</div>'
+            +'<div class="ot-bar"><div class="ot-bar-fill" style="width:'+Math.min(pct,100)+'%"></div></div>'
+            +'<div class="ot-rows">'+rows.join('')+'</div></div>';
+        }
+        // No allowance configured: show what is known rather than a percentage of nothing.
+        return '<div class="otile c-blue"><div class="ot-label">Usage this week</div>'
+          +'<div class="ot-value">'+fmtT(w.used||0)+'</div>'
+          +'<div class="ot-rows">'+rows.join('')
+          +'<div class="ot-row ot-row-hint"><span>Set weekly_token_budget for %</span></div></div></div>';
+      })(),
     ].join('');
 
     // 4. Agent status strip — compact row, not full pipeline diagram

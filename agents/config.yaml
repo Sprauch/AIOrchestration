@@ -34,6 +34,15 @@ system:
   max_pending_tasks: 3      # Architect holds approvals when this many tasks await developer
   max_pending_reviews: 5    # Slows upstream (PM triggers + architect tasks) when reviews back up
 
+  # Your plan's weekly token allowance, from the Claude Code plan page. Nothing in the
+  # CLI exposes it, so it has to be set here. 0 shows the raw counts without a
+  # percentage - which is honest, but "6% of this week" is the number worth acting on
+  # where "$1.21" is not, on a subscription.
+  weekly_token_budget: 0
+  # Which tokens count toward it: output, input, or both. "both" is the conservative
+  # reading; change it if the plan counts only one.
+  weekly_token_basis: both
+
   # A fresh `git worktree add` has the tracked files and nothing else. Everything below is
   # gitignored in the target project and needed anyway, so without it a developer agent
   # can edit and typecheck but cannot build - and work that cannot be verified is worse

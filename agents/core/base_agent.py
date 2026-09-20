@@ -302,16 +302,24 @@ class AgentProcess(ABC):
         inp, out = usage.get("input_tokens", 0), usage.get("output_tokens", 0)
         cost = usage.get("cost_usd", 0)
         increments: dict[str, int] = {}
+        # Per ISO week as well as per role. The plain totals answer "since when?" with
+        # "since somebody last cleared Redis", which is useless as a budget reference;
+        # a weekly bucket means the same thing every week and survives a flush.
+        year, week, _ = datetime.now(timezone.utc).isocalendar()
+        wk = f"{year}-W{week:02d}"
         if inp:
             increments[f"tokens_in:{self.role}"] = inp
             increments["tokens_in:total"] = inp
+            increments[f"tokens_in:week:{wk}"] = inp
         if out:
             increments[f"tokens_out:{self.role}"] = out
             increments["tokens_out:total"] = out
+            increments[f"tokens_out:week:{wk}"] = out
         if cost:
             cost_mc = int(cost * 100_000)
             increments[f"cost_mc:{self.role}"] = cost_mc
             increments["cost_mc:total"] = cost_mc
+            increments[f"cost_mc:week:{wk}"] = cost_mc
         await self._metrics.increment_many(increments)
         try:
             session.last_usage = None

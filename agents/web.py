@@ -14,6 +14,7 @@ import json
 import logging
 import time
 from dataclasses import asdict
+from datetime import datetime, timezone
 from pathlib import Path
 
 from aiohttp import web
@@ -41,7 +42,8 @@ class WebDashboard:
 
     def __init__(self, redis_url: str, port: int = 8081, gate_token: str | None = None,
                  idle_threshold: int = 600, max_change_rounds: int = 3, stream_read_limit: int = 500,
-                 max_pending_proposals: int = 3, max_pending_tasks: int = 3, max_pending_reviews: int = 5):
+                 max_pending_proposals: int = 3, max_pending_tasks: int = 3, max_pending_reviews: int = 5,
+                 weekly_token_budget: int = 0, weekly_token_basis: str = "both"):
         self.redis_url = redis_url
         self.port = port
         self.gate_token = gate_token
@@ -54,6 +56,8 @@ class WebDashboard:
             "tasks": max_pending_tasks,
             "reviews": max_pending_reviews,
         }
+        self.weekly_token_budget = weekly_token_budget
+        self.weekly_token_basis = weekly_token_basis
         self.bus = MessageBus(redis_url)
 
     async def start(self) -> None:
@@ -274,6 +278,31 @@ class WebDashboard:
             return web.json_response({"error": "Redis unreachable"}, status=503)
         data = asdict(snapshot)
 
+        # Weekly token usage against the plan allowance. The dashboard renders a ratio
+        # rather than an amount, because on a subscription "tokens used / tokens
+        # available" is the reference point and a dollar figure is not.
+        #
+        # The week is computed HERE rather than in the browser: a phone in another
+        # timezone would otherwise read a different ISO week than the one the agents
+        # wrote to, and silently show zero.
+        year, week, _ = datetime.now(timezone.utc).isocalendar()
+        wk = f"{year}-W{week:02d}"
+        m = data.get("metrics", {}) or {}
+        used_in = int(m.get(f"tokens_in:week:{wk}", 0) or 0)
+        used_out = int(m.get(f"tokens_out:week:{wk}", 0) or 0)
+        basis = (self.weekly_token_basis or "both").lower()
+        used = used_out if basis == "output" else used_in if basis == "input" else used_in + used_out
+        data["weekly"] = {
+            "week": wk,
+            "tokens_in": used_in,
+            "tokens_out": used_out,
+            "used": used,
+            "budget": self.weekly_token_budget,
+            "basis": basis,
+            "cost_mc": int(m.get(f"cost_mc:week:{wk}", 0) or 0),
+            "pct": round(used * 100.0 / self.weekly_token_budget, 1) if self.weekly_token_budget else None,
+        }
+
         # Enrich with challenger/deliberation state from recent cli-traces
 
         challengers = {}  # role -> {"active": bool, "last_seen": timestamp}
@@ -289,7 +318,11 @@ class WebDashboard:
                         sender_role = env.sender_role
                         ts = env.timestamp
                         try:
-                            from datetime import datetime
+                            # No local import: `datetime` is imported at module level,
+                            # and re-importing it here made it a LOCAL name for the whole
+                            # function - so any use of it earlier in the same function
+                            # raised UnboundLocalError. Python binds by function scope,
+                            # not by line order.
                             t = datetime.fromisoformat(ts).timestamp()
                         except Exception:
                             t = 0
