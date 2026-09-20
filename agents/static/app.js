@@ -117,10 +117,12 @@ function formatReviewRequest(p) {
 const viewTitles = {overview:'Overview',work:'Workflow',exceptions:'Actions',system:'Diagnostics'};
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>switchView(n.dataset.view)));
 function switchView(name) {
-  if(name==='work'&&typeof renderRefused==='function')renderRefused();
   // Decision Gates lives on Actions now: the rules belong beside the decisions
   // they produce, not a tab away from them.
-  if(name==='exceptions'&&typeof renderDecisionGates==='function')renderDecisionGates();
+  if(name==='exceptions'){
+    if(typeof renderDecisionGates==='function')renderDecisionGates();
+    if(typeof renderRefused==='function')renderRefused();
+  }
   // Auto-close thread detail overlay when switching views
   const overlay=document.getElementById('thread-overlay');
   if(overlay&&overlay.style.display!=='none')closeThreadDetail();
