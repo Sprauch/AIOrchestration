@@ -1,0 +1,39 @@
+# The repository had no .gitignore, so every test run and every orchestrator run left
+# the tree dirty and artifacts were swept into commits by anything using `git add`.
+
+# Python bytecode. 101 of these were tracked, which meant compiled copies of the source
+# travelled alongside the source and went stale the moment either changed.
+__pycache__/
+*.py[cod]
+
+# Test and packaging output.
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg-info/
+build/
+dist/
+
+# Virtualenvs.
+.venv/
+venv/
+env/
+
+# Agent worktrees: a full checkout of the TARGET project, one per agent, created and
+# removed by the orchestrator. Never this repository's own content, and large.
+.worktrees/
+
+# Runtime output: per-agent CLI traces and the dashboard request log, rewritten on every
+# run. This covers the default location; log_dir is configurable, so a custom one needs
+# its own rule.
+agents/logs/
+
+# Secrets. safety.protected_files already stops an agent editing .env; this stops git
+# publishing it.
+.env
+.env.*
+!.env.example
+
+# OS cruft.
+.DS_Store
+Thumbs.db
