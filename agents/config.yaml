@@ -159,15 +159,24 @@ safety:
     - "git reset --hard"
     - "DROP TABLE"
     - "DELETE FROM"
-    # Project-specific. Installing or changing dependencies needs explicit human
-    # approval here, and a regeneration is a version bump plus an image pass rather
-    # than a command an agent runs on its own initiative.
-    - "npm install"
-    - "npm uninstall"
-    - "npm update"
-    - "yarn add"
-    - "production-update"
-    - "deploy-dreamhost"
+    # NOTHING PROJECT-SPECIFIC HERE, and the reason is worth keeping.
+    #
+    # blocked_patterns is checked by safety.check_prompt() against the TEXT OF THE
+    # PROMPT, not against commands an agent runs. Adding "npm install",
+    # "production-update" and similar looked like "do not let agents do these things";
+    # what it actually did was refuse any message whose text MENTIONED them.
+    #
+    # It fired immediately. The PM proposed something that discussed dependencies, and
+    # the architect could not review the proposal at all:
+    #
+    #   SafetyViolation: Prompt contains 'npm install'
+    #
+    # 1.7M tokens and $2.56 spent by the architect, three proposals consumed, nothing
+    # produced. A rule meant to prevent an action prevented a conversation.
+    #
+    # Execution is controlled where execution happens: allowed_tools per agent, and
+    # human_approval_required below. The patterns that remain are the ones where the
+    # text appearing in a prompt is itself the warning sign.
   protected_files:
     - ".env"
     - "vercel.json"

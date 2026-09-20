@@ -517,7 +517,7 @@ class AgentProcess(ABC):
                             logger.info("Agent %s: %s, holding task assignment", self.agent_id, reason)
                             break
                     # No REVIEW_REQUEST gate — developer always publishes review requests.
-                    # Review backpressure slows upstream (PM triggers + tech lead tasks) instead.
+                    # Review backpressure slows upstream (PM triggers + architect tasks) instead.
                 except Exception:
                     pass
 

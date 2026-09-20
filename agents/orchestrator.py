@@ -1004,7 +1004,7 @@ class Orchestrator:
 
     async def _find_branch_for_thread(self, thread_id: str) -> str | None:
         try:
-            # Check Redis hash first (set by tech lead on task assignment)
+            # Check Redis hash first (set by architect on task assignment)
             branch = await self.bus.redis.hget("orchestrator:thread_branches", thread_id)
             if branch:
                 return branch

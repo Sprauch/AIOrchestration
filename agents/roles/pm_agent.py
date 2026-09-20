@@ -42,7 +42,7 @@ class PMAgent(AgentProcess):
             if decision in ("needs_revision", "needs_clarification", "rejected"):
                 concerns = envelope.payload.get("concerns", [])[:5]
                 return (
-                    f"The tech lead requested revisions.\n"
+                    f"The architect requested revisions.\n"
                     f"Decision: {decision}\n"
                     f"Concerns:\n"
                     + "\n".join(f"  - {str(c)[:300]}" for c in concerns)

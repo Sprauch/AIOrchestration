@@ -184,7 +184,7 @@ def derive_current_phase(
             active_roles.add(r)
 
     # Backpressure stages map to roles that consume from those queues:
-    # designs -> product designer, proposals -> tech lead, tasks -> developer, reviews -> reviewer
+    # designs -> product designer, proposals -> architect, tasks -> developer, reviews -> reviewer
     _bp_to_role = {"designs": "product_designer", "proposals": "architect", "tasks": "developer", "reviews": "reviewer"}
     if backpressure:
         for stage, info in backpressure.items():

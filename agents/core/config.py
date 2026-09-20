@@ -126,7 +126,7 @@ class SystemConfig(BaseSettings):
     max_wip: int = 0  # deprecated: if >0, overrides all per-stage limits below
     max_pending_proposals: int = 3  # PM pauses when this many proposals await technical review
     max_pending_tasks: int = 3  # Architect holds approvals when this many tasks await developer
-    max_pending_reviews: int = 5  # Slows upstream (PM triggers + tech lead tasks) when reviews back up
+    max_pending_reviews: int = 5  # Slows upstream (PM triggers + architect tasks) when reviews back up
     web_gate_token: str | None = None
     # Self-healing
     heartbeat_stale_threshold: int = 60
@@ -228,7 +228,7 @@ def _known_env_vars(config: OrchestratorConfig | None = None) -> set[str]:
     names.add(f"{_ENV_PREFIX}SAFETY_MAX_FILES_PER_CHANGE")
 
     # Per-role overrides: {PREFIX}{ROLE}_{MODEL|COUNT|CLI}
-    role_names: set[str] = {"PM", "PRODUCT_DESIGNER", "TECH_LEAD", "DEVELOPER", "REVIEWER"}
+    role_names: set[str] = {"PM", "PRODUCT_DESIGNER", "ARCHITECT", "DEVELOPER", "REVIEWER"}
     if config is not None:
         for role in config.agents:
             role_names.add(role.upper())

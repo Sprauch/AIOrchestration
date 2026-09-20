@@ -218,7 +218,7 @@ class WebDashboard:
                 timestamp = parts[1] if len(parts) > 1 else ""
                 detail = parts[2] if len(parts) > 2 else ""
 
-                # Look up branch name from cached hash (set by tech lead on task publish)
+                # Look up branch name from cached hash (set by architect on task publish)
                 branch = ""
                 try:
                     branch = await r.hget("orchestrator:thread_branches", thread_id) or ""
@@ -683,7 +683,7 @@ class WebDashboard:
 
             summary_bits = [f"{t['proposal_submissions']} PM submission" + ("" if t["proposal_submissions"] == 1 else "s")]
             if t["proposal_approvals"]:
-                summary_bits.append(f"{t['proposal_approvals']} tech-lead-approved")
+                summary_bits.append(f"{t['proposal_approvals']} architect-approved")
             if t["proposal_rejections"]:
                 summary_bits.append(f"{t['proposal_rejections']} rejected")
             if t["proposal_revisions"]:
@@ -724,7 +724,7 @@ class WebDashboard:
                 t["blocked_reason"] = t["concerns"][0] if t["concerns"] else ""
                 t["needs_human"] = False
             elif status == "failed":
-                t["why"] = "Rejected by tech lead"
+                t["why"] = "Rejected by architect"
                 t["blocked_reason"] = ""
                 t["needs_human"] = False
             elif t["pr"] and t["pr"].get("status") == "failed":
@@ -741,13 +741,13 @@ class WebDashboard:
                 "analyzing": "Being analyzed by PM",
                 "proposed": "Proposal submitted, awaiting technical review",
                 "approved": "Architect approved, awaiting developer",
-                "revision_requested": "PM revising based on tech lead feedback",
+                "revision_requested": "PM revising based on architect feedback",
                 "implementing": "Developer implementing on " + (t["branch"] or "agent branch"),
                 "awaiting_review": "Implementation complete, awaiting reviewer",
                 "in_review": "Under code review",
                 "rework": "Developer reworking after reviewer feedback",
                 "completed": "Approved and done",
-                "rejected": "Rejected by tech lead",
+                "rejected": "Rejected by architect",
                 "cycle_exhausted": f"Blocked after {t['review_cycles']} review cycles",
                 "abandoned": "Abandoned by operator",
             }

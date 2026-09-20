@@ -990,7 +990,7 @@ class MonitorApp(App):
             MessageType.SYSTEM: "TRIGGER",
             MessageType.PROPOSAL: "PROPOSAL",
             MessageType.DESIGN_FEEDBACK: "DESIGN",
-            MessageType.PROPOSAL_REVIEW: "TECH LEAD",
+            MessageType.PROPOSAL_REVIEW: "ARCHITECT",
             MessageType.TASK_ASSIGNMENT: "TASK",
             MessageType.TASK_PROGRESS: "PROGRESS",
             MessageType.REVIEW_REQUEST: "REVIEW REQ",
