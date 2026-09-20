@@ -331,7 +331,15 @@ async function refreshOverview() {
       if(healthy)parts.push(healthy+' in progress.');
       if(completed)parts.push(completed+' shipped.');
       if(costStr)parts.push(costStr+' spent.');
-      sb.innerHTML='<div class="brief brief-'+statusClass+'"><div class="brief-dot"></div><div class="brief-text">'+parts.join(' ')+'</div></div>';
+      // When the orchestrator is down, offer to start it rather than only reporting it.
+      // Rendered ABOVE the brief so it is the first thing read, and ONLY when
+      // disconnected: an always-present start button on a running system is an invitation
+      // to a second orchestrator against one Redis.
+      const startBtn=(statusClass==='bad')
+        ? '<div class="brief-action"><button id="btn-start-orch" onclick="startOrchestrator()">Start orchestrator</button>'
+          +'<span id="start-orch-msg"></span></div>'
+        : '';
+      sb.innerHTML=startBtn+'<div class="brief brief-'+statusClass+'"><div class="brief-dot"></div><div class="brief-text">'+parts.join(' ')+'</div></div>';
     }
 
     // 2. Attention brief — max 5 items, problem threads + approvals
@@ -1022,6 +1030,52 @@ async function refreshExceptions(){
   }catch(e){console.error(e);}
 }
 async function gateAction(id,action){const h={method:'POST'};const tok=localStorage.getItem('gate_token');if(tok)h.headers={'Authorization':'Bearer '+tok};const r=await fetch('/api/gates/'+id+'/'+action,h);if(r.status===401){const t=prompt('Gate token required:');if(t){localStorage.setItem('gate_token',t);return gateAction(id,action);}}refreshExceptions();refreshOverview();}
+
+// ── Orchestrator control ──
+// Follows the same token pattern as gateAction: stored in localStorage, prompted for on
+// 401, retried once. That means pairing a phone once works for approvals AND for this.
+async function startOrchestrator(){
+  const btn=document.getElementById('btn-start-orch');
+  const msg=document.getElementById('start-orch-msg');
+  const say=(t)=>{if(msg)msg.textContent=t;};
+  if(btn){btn.disabled=true;btn.textContent='Starting...';}
+  say('');
+  try{
+    const h={method:'POST'};
+    const tok=localStorage.getItem('gate_token');
+    if(tok)h.headers={'Authorization':'Bearer '+tok};
+    const r=await fetch('/api/orchestrator/start',h);
+    if(r.status===401){
+      const t=prompt('Dashboard token required to start the orchestrator:');
+      if(t){localStorage.setItem('gate_token',t);return startOrchestrator();}
+      say('cancelled');
+      if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
+      return;
+    }
+    const data=await r.json().catch(()=>({}));
+    if(!r.ok||!data.started){
+      say(data.error||('failed (HTTP '+r.status+')'));
+      if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
+      return;
+    }
+    // Startup runs preflight, cleans stale worktrees and connects every agent, so the
+    // heartbeat does not appear immediately. Poll rather than claim success: saying
+    // "started" before it is up is how a failed start looks like a working one.
+    say('started (pid '+data.pid+'), waiting for heartbeat...');
+    for(let i=0;i<40;i++){
+      await new Promise(r=>setTimeout(r,1500));
+      try{
+        const s=await (await fetch('/api/orchestrator')).json();
+        if(s.running){say('');if(typeof refresh==='function')refresh();return;}
+      }catch(e){}
+    }
+    say('started, but no heartbeat after 60s - check the orchestrator window');
+    if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
+  }catch(e){
+    say('failed: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
+  }
+}
 
 // ── Thread actions ──
 async function resetCycles(tid){try{const h={method:'POST'};const tok=localStorage.getItem('gate_token');if(tok)h.headers={'Authorization':'Bearer '+tok};const r=await fetch('/api/threads/'+tid+'/reset-cycles',h);if(r.status===401){const t=prompt('Gate token required:');if(t){localStorage.setItem('gate_token',t);return resetCycles(tid);}}if(!r.ok){const b=await r.text();console.error('resetCycles failed:',r.status,b);alert('Reset failed: '+r.status);}else{refreshExceptions();refreshOverview();}}catch(e){console.error('resetCycles error:',e);alert('Reset error: '+e.message);}}

@@ -23,6 +23,7 @@ from agents.core.message import Envelope, MessageType
 from agents.core.message_bus import MessageBus
 from agents.core.redis_keys import _active_keys, _clear_active_work_thread
 from agents.core.state import derive_current_phase, load_snapshot
+from agents.core.supervisor import SupervisorError, is_running, spawn_orchestrator
 from agents.core.thread_guard import THREAD_CYCLES_KEY
 
 logger = logging.getLogger(__name__)
@@ -67,6 +68,8 @@ class WebDashboard:
         app.router.add_get("/api/threads/{thread_id}", self._handle_thread_detail)
         app.router.add_get("/api/agents/{agent_id}", self._handle_agent_detail)
         app.router.add_get("/api/streams/{stream_name}", self._handle_stream_messages)
+        app.router.add_get("/api/orchestrator", self._handle_orchestrator_status)
+        app.router.add_post("/api/orchestrator/start", self._handle_orchestrator_start)
         app.router.add_get("/api/gates", self._handle_gates)
         app.router.add_post("/api/gates/{gate_id}/approve", self._handle_gate_approve)
         app.router.add_post("/api/gates/{gate_id}/deny", self._handle_gate_deny)
@@ -1089,6 +1092,50 @@ class WebDashboard:
                 headers={"WWW-Authenticate": "Bearer"},
             )
         return None
+
+    async def _handle_orchestrator_status(self, request: web.Request) -> web.Response:
+        """Is one running, and may this caller start one?
+
+        `can_start` lets the UI show a disabled button with a reason rather than offering
+        one that fails - a button that looks available and is not is worse than no button.
+        """
+        running = await is_running(self.bus.redis)
+        return web.json_response({
+            "running": running,
+            "can_start": not running,
+            "reason": "already running" if running else "",
+            "auth_required": bool(self.gate_token),
+        })
+
+    async def _handle_orchestrator_start(self, request: web.Request) -> web.Response:
+        """Start a detached orchestrator.
+
+        Behind the same token as approve/deny, and for a stronger reason: this starts a
+        process that will edit files, run commands and open pull requests. If anything on
+        this dashboard needs authenticating, it is this.
+        """
+        if err := self._check_gate_auth(request):
+            return err
+
+        # Re-check under the request rather than trusting the UI's last poll. Two tabs,
+        # or a stale page, would otherwise start two orchestrators against one Redis.
+        if await is_running(self.bus.redis):
+            return web.json_response(
+                {"started": False, "error": "an orchestrator is already running"}, status=409,
+            )
+
+        try:
+            pid = spawn_orchestrator()
+        except SupervisorError as exc:
+            logger.error("orchestrator start failed: %s", exc)
+            return web.json_response({"started": False, "error": str(exc)}, status=500)
+
+        # Deliberately NOT waiting for the heartbeat here. Startup runs preflight, cleans
+        # stale worktrees and connects every agent, which takes longer than a request
+        # should block for. The UI polls the status endpoint instead, so a slow start
+        # looks like a slow start rather than a failed request.
+        logger.info("orchestrator started from dashboard, pid %s", pid)
+        return web.json_response({"started": True, "pid": pid})
 
     async def _handle_gate_approve(self, request: web.Request) -> web.Response:
         if err := self._check_gate_auth(request):

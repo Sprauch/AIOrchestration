@@ -1195,3 +1195,32 @@ tr.click { cursor: pointer; }
   .topnav { padding: 0 16px; }
   .overlay-card { width: 100vw; max-width: 100vw; }
 }
+
+/* Start-orchestrator action, shown above the status brief only when disconnected.
+   Uses the same tokens as the rest of the dashboard so it does not read as bolted on. */
+.brief-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.brief-action button {
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-bright);
+  background: var(--accent);
+  color: var(--bg);
+  cursor: pointer;
+  transition: filter 120ms ease, opacity 120ms ease;
+}
+.brief-action button:hover:not(:disabled) { filter: brightness(1.12); }
+.brief-action button:disabled { opacity: 0.55; cursor: default; }
+#start-orch-msg {
+  font-size: 12.5px;
+  color: var(--dim);
+  letter-spacing: -0.01em;
+}
