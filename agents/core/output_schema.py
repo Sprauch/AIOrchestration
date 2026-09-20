@@ -16,7 +16,7 @@ from __future__ import annotations
 from copy import deepcopy
 
 
-# LENGTH BUDGETS.
+# NOTHING HERE TRUNCATES PROSE.
 #
 # maxLength in a structured-output schema is not a validator that rejects an over-long
 # string. It constrains DECODING: the model is stopped the moment it reaches the limit,
@@ -24,38 +24,39 @@ from copy import deepcopy
 #
 #   "...every install since the Angular 16 upgrade would ha"
 #
-# which is not a shorter review, it is an unreadable one. The limits below had been in
-# the schema from the start and never bit, because --json-schema was being silently
-# dropped before it reached the CLI; fixing that made every one of them real at once.
+# which is not a shorter review, it is an unreadable one. Those limits were in the schema
+# from the initial import with no recorded reason, and never bit, because --json-schema
+# was being dropped before it reached the CLI; fixing that made all of them real at once.
 #
-# So the budget is stated in the PROMPTS, where a model can compose to fit and finish its
-# sentence, and the numbers here are HEADROOM - large enough that hitting one means
-# something has gone wrong, not that a thought was long. Nothing else caps payload size
-# (max_payload_bytes is declared in config and never read), so headroom is not unbounded.
-# These are RUNAWAY GUARDS, set far above any real answer, not budgets. Cutting a concern
-# short has no benefit worth having: the tokens saved are trivial beside what the architect
-# spent deriving it, and a severed concern forces another round that costs more than the
-# text it saved. What usefully forces prioritisation is maxItems - five concerns, six
-# recommendations - because limiting the NUMBER makes a writer choose, where limiting the
-# LENGTH only removes the end of the reasoning. The prompts state the working budget
-# (~900 characters for a point); these numbers exist only so a pathological loop cannot
-# emit megabytes, since nothing else caps payload size.
-BRIEF = 1000       # a signal, a goal, a one-line outcome        (prompts ask for ~300)
-POINT = 3000       # one complete point: concern, recommendation (prompts ask for ~900)
-NARRATIVE = 5000   # the longest prose any role writes: approach (prompts ask for ~1,600)
-
-# Short FORMAT fields keep tight limits, because for these the length IS the contract:
-# a branch name, a file path, a severity word, an id.
+# THE TRADE, and it is not close. A complete message costs a few hundred tokens once. An
+# incomplete one costs a reader - human or agent - guessing at the missing context while
+# doing the work, and usually another round to recover what was cut. Letting prose run as
+# long as the context requires is the cheap option; the expensive option is paying later
+# for what was removed here.
+#
+# What still constrains output is maxItems: five concerns, six recommendations. Limiting
+# the NUMBER makes a writer choose what matters, which is the useful pressure. Limiting
+# the LENGTH only removes the end of the reasoning, which is not.
+#
+# The single exception below is thread_id, where a fixed width is a genuine contract - it
+# is an id the system generated and the agent echoes back, and it is sliced for display.
 
 
 def _str(max_len: int) -> dict:
+    """A bounded string. Only for FORMAT fields, never for prose."""
     return {"type": "string", "maxLength": max_len}
 
 
-def _str_array(max_items: int, max_len: int) -> dict:
+def _text() -> dict:
+    """Unbounded text. The default for anything a person reads."""
+    return {"type": "string"}
+
+
+def _text_array(max_items: int) -> dict:
+    """A bounded NUMBER of unbounded entries — count is capped, content is not."""
     return {
         "type": "array",
-        "items": _str(max_len),
+        "items": _text(),
         "maxItems": max_items,
     }
 
@@ -77,19 +78,19 @@ PROPOSAL_PAYLOAD = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
-        # 100 not 80: the prompt asks for 80 so there is headroom before the schema
-        # rejects an otherwise good proposal. The API does not truncate, so the only
-        # enforcement is here and in the prompt.
-        "title": _str(100),
+        # Unbounded like everything else. The prompt asks for a headline under 80
+        # characters and says why; a list ellipsizes in CSS, where it knows how much room
+        # it has. A title cut mid-word by the schema helped nobody.
+        "title": _text(),
         "target_area": {"type": "string", "enum": ["product", "ux", "trust", "reliability", "technical", "cost", "onboarding", "workflow"]},
-        "user_problem": _str(POINT),
-        "description": _str(POINT),
-        "proposed_change": _str(POINT),
-        "rationale": _str(POINT),
-        "expected_user_outcome": _str(POINT),
-        "success_signal": _str(BRIEF),
+        "user_problem": _text(),
+        "description": _text(),
+        "proposed_change": _text(),
+        "rationale": _text(),
+        "expected_user_outcome": _text(),
+        "success_signal": _text(),
         "priority": {"type": "integer", "minimum": 1, "maximum": 5},
-        "affected_files": _str_array(10, 100),
+        "affected_files": _text_array(10),
         "estimated_effort": {"type": "string", "enum": ["small", "medium", "large"]},
         "category": {"type": "string", "enum": ["product", "ux", "trust", "workflow", "adoption", "reliability", "technical", "cost", "onboarding", "feature"]},
     },
@@ -112,13 +113,13 @@ DESIGN_FEEDBACK_PAYLOAD = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
-        "summary": _str(POINT),
-        "user_experience_problem": _str(POINT),
-        "design_goal": _str(POINT),
-        "recommendations": _str_array(6, POINT),
+        "summary": _text(),
+        "user_experience_problem": _text(),
+        "design_goal": _text(),
+        "recommendations": _text_array(6),
         "priority": {"type": "integer", "minimum": 1, "maximum": 5},
-        "target_surfaces": _str_array(8, 120),
-        "success_signal": _str(BRIEF),
+        "target_surfaces": _text_array(8),
+        "success_signal": _text(),
     },
     "required": ["summary", "user_experience_problem", "design_goal", "recommendations", "priority", "target_surfaces", "success_signal"],
 }
@@ -134,7 +135,7 @@ PROPOSAL_REVIEW_PAYLOAD = {
     "additionalProperties": False,
     "properties": {
         "decision": {"type": "string", "enum": ["approved", "rejected", "needs_revision", "needs_clarification"]},
-        "concerns": _str_array(5, POINT),
+        "concerns": _text_array(5),
     },
     "required": ["decision", "concerns"],
 }
@@ -149,12 +150,12 @@ TASK_ASSIGNMENT_PAYLOAD = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
-        "approach": _str(NARRATIVE),
-        "branch_name": _str(80),
-        "files_to_modify": _str_array(10, 100),
-        "files_to_create": _str_array(10, 100),
-        "acceptance_criteria": _str_array(5, BRIEF),
-        "testing_strategy": _str(POINT),
+        "approach": _text(),
+        "branch_name": _text(),
+        "files_to_modify": _text_array(10),
+        "files_to_create": _text_array(10),
+        "acceptance_criteria": _text_array(5),
+        "testing_strategy": _text(),
     },
     "required": ["approach", "branch_name", "files_to_modify", "files_to_create", "acceptance_criteria", "testing_strategy"],
 }
@@ -170,9 +171,9 @@ TASK_PROGRESS_PAYLOAD = {
     "additionalProperties": False,
     "properties": {
         "status": {"type": "string", "enum": ["completed", "blocked", "in_progress"]},
-        "branch_name": _str(80),
-        "changes_summary": _str(POINT),
-        "files_changed": _str_array(10, 100),
+        "branch_name": _text(),
+        "changes_summary": _text(),
+        "files_changed": _text_array(10),
     },
     "required": ["status", "branch_name", "changes_summary", "files_changed"],
 }
@@ -187,11 +188,11 @@ REVIEW_REQUEST_PAYLOAD = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
-        "branch_name": _str(80),
-        "files_changed": _str_array(10, 100),
+        "branch_name": _text(),
+        "files_changed": _text_array(10),
         "tests_passed": {"type": "boolean"},
-        "tests_added": _str_array(10, 100),
-        "notes": _str(POINT),
+        "tests_added": _text_array(10),
+        "notes": _text(),
     },
     "required": ["branch_name", "files_changed", "tests_passed", "tests_added", "notes"],
 }
@@ -206,10 +207,10 @@ REVIEW_COMMENT = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
-        "file": _str(100),
+        "file": _text(),
         "line": {"type": ["integer", "null"]},
-        "severity": _str(20),
-        "comment": _str(POINT),
+        "severity": _text(),
+        "comment": _text(),
     },
     "required": ["file", "line", "severity", "comment"],
 }
@@ -219,14 +220,14 @@ REVIEW_RESULT_PAYLOAD = {
     "additionalProperties": False,
     "properties": {
         "decision": {"type": "string", "enum": ["approved", "changes_requested"]},
-        "summary": _str(POINT),
-        "blocking_issues": _str_array(5, 200),
+        "summary": _text(),
+        "blocking_issues": _text_array(5),
         "comments": {
             "type": "array",
             "items": REVIEW_COMMENT,
             "maxItems": 10,
         },
-        "approval_note": _str(POINT),
+        "approval_note": _text(),
     },
     # API requires every property key to be in required.
     "required": ["decision", "summary", "blocking_issues", "comments", "approval_note"],

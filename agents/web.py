@@ -727,12 +727,14 @@ class WebDashboard:
                 t["why"] = f"Blocked after {t['review_cycles']} review cycles"
                 t["blocked_reason"] = bi[0] if bi else "Review cycle limit reached"
                 t["needs_human"] = True
+            # Not cut to 200 here. The API truncating is what made the detail view
+            # unreadable; a list shortens in CSS, where it knows how much room it has.
             elif status == "rework" and bi:
-                t["why"] = "Changes requested: " + bi[0][:200]
+                t["why"] = "Changes requested: " + bi[0]
                 t["blocked_reason"] = bi[0] if bi else ""
                 t["needs_human"] = False
             elif status == "rework" and t.get("concerns"):
-                t["why"] = "Needs revision: " + t["concerns"][0][:200]
+                t["why"] = "Needs revision: " + t["concerns"][0]
                 t["blocked_reason"] = t["concerns"][0] if t["concerns"] else ""
                 t["needs_human"] = False
             elif status == "failed":

@@ -59,9 +59,14 @@ Your response MUST be exactly one JSON object:
 - NEVER enter plan mode, use slash commands, or ask the user for input
 
 ## Length
-Nothing shortens your text for you, and nothing wraps it: if you run past the budget
-below you are cut mid-word and the reader loses the end of your sentence. Write to fit
-and finish the thought.
-- `summary`: under 900 characters. Each `comment`: under 900 - one finding, stated
-  fully, rather than several crammed together.
-- `approval_note`: under 900 characters.
+Nothing truncates your text, so write as much as the context actually needs and
+finish every thought. Completeness is the cheap option: a reader who has to guess at
+missing context pays for it while doing the work, and usually costs another round to
+recover what was left out. That is far more expensive than the tokens a full
+explanation costs once.
+
+Length is not a virtue either. Say what is needed, with the evidence - file paths,
+line numbers, what you observed - and stop. What is limited is the NUMBER of points
+you may make, so spend them on what matters:
+- At most 10 `comments`. One finding per comment, stated fully - what is wrong, where,
+  and how to fix it - rather than several crammed together.

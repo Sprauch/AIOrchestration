@@ -1,8 +1,10 @@
 """Tests for Envelope, MessageType, and payload normalization."""
 
+import json
+
 from agents.core.message import (
     Envelope, MessageType, normalize_payload,
-    MAX_STRING_FIELD, MAX_ARRAY_ITEMS,
+    MAX_ARRAY_ITEMS, MAX_PAYLOAD_BYTES,
 )
 
 
@@ -60,10 +62,18 @@ def test_message_type_values():
 
 # ── Payload normalization ──────────────────────────────────
 
-def test_normalize_truncates_long_strings():
+def test_normalize_leaves_long_prose_intact():
+    """Prose is NOT truncated per field.
+
+    This used to cut every string to 500 characters before publish — a second truncator,
+    independent of the output schema, and the deeper of the two: measured review concerns
+    run 886 to 1,107 characters, so it took the end off every real review. A complete
+    message costs a few hundred tokens once; an incomplete one costs a reader guessing at
+    the missing context, and usually a round to recover what was cut.
+    """
     payload = {"reasoning": "x" * 1000}
     result = normalize_payload(payload)
-    assert len(result["reasoning"]) == MAX_STRING_FIELD
+    assert result["reasoning"] == payload["reasoning"]
 
 
 def test_normalize_caps_arrays():
@@ -79,11 +89,28 @@ def test_normalize_preserves_short_fields():
     assert result["priority"] == 2
 
 
-def test_normalize_truncates_strings_in_arrays():
+def test_normalize_leaves_prose_in_arrays_intact():
+    """The same applies inside arrays — this is where concerns and comments live."""
     payload = {"issues": ["x" * 1000, "short"]}
     result = normalize_payload(payload)
-    assert len(result["issues"][0]) == MAX_STRING_FIELD
+    assert result["issues"][0] == payload["issues"][0]
     assert result["issues"][1] == "short"
+
+
+def test_normalize_blocks_only_a_genuinely_runaway_payload():
+    """The remaining guard is TOTAL size, and it is far above any real message.
+
+    A single honest proposal - six prose fields plus file lists - could reach the old
+    8 KB ceiling, and exceeding it DROPS the message rather than shortening it. The
+    shrink passes are kept for the runaway case, because a shortened message still beats
+    a discarded one.
+    """
+    realistic = {f"field_{i}": "x" * 1200 for i in range(8)}
+    assert normalize_payload(realistic)  # nowhere near the ceiling
+
+    runaway = {f"field_{i}": "x" * 100_000 for i in range(20)}
+    shrunk = normalize_payload(runaway)  # shortened rather than dropped
+    assert len(json.dumps(shrunk).encode()) <= MAX_PAYLOAD_BYTES
 
 
 def test_normalize_empty_payload():

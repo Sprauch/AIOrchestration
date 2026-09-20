@@ -13,10 +13,25 @@ from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
-# Hard limits on payload fields to prevent unbounded messages
-MAX_PAYLOAD_BYTES = 8192
-MAX_STRING_FIELD = 500
-MAX_ARRAY_ITEMS = 10
+# Guards against a runaway message — NOT a budget for prose.
+#
+# MAX_STRING_FIELD used to be 500, applied to every string in every payload before
+# publish. That is a second truncator, independent of the output schema, and it cut deeper
+# than the schema did: measured review concerns run 886 to 1,107 characters, so removing
+# the schema's limit alone would have moved the cut from 300 to 500 and left the text just
+# as unreadable.
+#
+# Prose is no longer truncated per field. A complete message costs a few hundred tokens
+# once; an incomplete one costs a reader guessing at the missing context while doing the
+# work, plus a round to recover what was cut. The cheap option is to let it through.
+#
+# What remains is a TOTAL size guard, raised from 8 KB - which a single honest proposal
+# with six prose fields could reach, and exceeding it DROPS THE MESSAGE - to a ceiling no
+# real message approaches. The two shrink passes below are kept, because if something ever
+# does run away, a shortened message still beats a discarded one.
+MAX_PAYLOAD_BYTES = 262144  # 256 KB
+MAX_STRING_FIELD = None     # no per-field truncation
+MAX_ARRAY_ITEMS = 10        # count, not length: matches the schema's own maxItems
 MAX_NESTING_DEPTH = 3
 
 
@@ -72,6 +87,8 @@ def _normalize_value(value, depth: int = 0):
         return None
 
     if isinstance(value, str):
+        if MAX_STRING_FIELD is None:
+            return value
         return value[:MAX_STRING_FIELD] if len(value) > MAX_STRING_FIELD else value
 
     if isinstance(value, list):

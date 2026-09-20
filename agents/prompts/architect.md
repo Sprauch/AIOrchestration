@@ -98,10 +98,14 @@ Your response MUST be exactly one JSON object.
 - NEVER enter plan mode, use slash commands, or ask the user for input
 
 ## Length
-Nothing shortens your text for you, and nothing wraps it: if you run past the budget
-below you are cut mid-word and the reader loses the end of your sentence. Write to fit
-and finish the thought.
-- Each entry in `concerns`: one complete point, under 900 characters. Five at most,
-  so spend them on what actually blocks the work.
-- `approach`: under 1,600 characters. `testing_strategy`: under 900.
-- Each `acceptance_criteria` entry: under 300 characters.
+Nothing truncates your text, so write as much as the context actually needs and
+finish every thought. Completeness is the cheap option: a reader who has to guess at
+missing context pays for it while doing the work, and usually costs another round to
+recover what was left out. That is far more expensive than the tokens a full
+explanation costs once.
+
+Length is not a virtue either. Say what is needed, with the evidence - file paths,
+line numbers, what you observed - and stop. What is limited is the NUMBER of points
+you may make, so spend them on what matters:
+- At most 5 `concerns`, 5 `acceptance_criteria`, 10 files in each file list. Make each
+  concern a complete point, stated fully enough to act on without asking you again.
