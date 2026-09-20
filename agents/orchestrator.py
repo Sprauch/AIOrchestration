@@ -18,6 +18,7 @@ from agents.core.config import OrchestratorConfig
 from agents.core.message import Envelope, MessageType
 from agents.core.message_bus import MessageBus
 from agents.core.metrics import Metrics
+from agents.core.mode import MANUAL, ensure_mode, get_mode
 from agents.core.output_schema import get_output_schema_for_role
 from agents.core.preflight import run_preflight, stamp_schema_version
 from agents.core.worktree import remove_worktree
@@ -510,6 +511,8 @@ class Orchestrator:
         self._spawn_agents(agent_filter, agent_id_override)
 
         await asyncio.sleep(2)
+        mode = await ensure_mode(self.bus.redis, self.config.system.mode)
+        logger.info("Orchestration mode: %s", mode)
         await self._publish_startup_triggers()
         await self._repair_stalled_pipeline()
 
@@ -676,6 +679,14 @@ class Orchestrator:
                     logger.exception("Failed to surface stalled pipeline for %s/%s", stage, thread_id[:8])
 
     async def _publish_startup_triggers(self) -> None:
+        # MANUAL MODE: nothing kicks the PM, because the human supplies the proposals.
+        # The PM agent also stands down on its own (see base_agent), so this is belt and
+        # braces rather than the only guard - but without it a restart in manual mode
+        # would still hand the PM one free turn.
+        if await get_mode(self.bus.redis, self.config.system.mode) == MANUAL:
+            logger.info("Manual mode: no PM trigger — proposals come from the human")
+            return
+
         # Per-stage check: count unresolved design + proposal backlog for PM trigger decision
         proposals = await self._active_work_count("designs") + await self._active_work_count("proposals")
         max_proposals = self.config.system.max_pending_proposals

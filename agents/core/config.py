@@ -145,6 +145,10 @@ class SystemConfig(BaseSettings):
     pipeline_repair_interval: int = 60
     analysis_context: str = ""  # optional context prepended to startup triggers
     dogfood_mode: bool = False  # explicit opt-in for self-analysis behavior
+    # Who proposes work the FIRST time this orchestrator runs: "automatic" (the PM
+    # agent) or "manual" (you do). After that the live value lives in Redis, because
+    # the switch has to work without a restart. See agents/core/mode.py.
+    mode: str = "automatic"
     worktree_setup: WorktreeSetupConfig | None = None  # see WorktreeSetupConfig
     # Your plan's weekly allowance in TOKENS, so the dashboard can show usage as a
     # percentage rather than an amount. On a subscription a dollar figure means little -

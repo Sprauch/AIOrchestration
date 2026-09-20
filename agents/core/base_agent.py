@@ -25,6 +25,7 @@ from agents.core.redis_keys import (
 from agents.core.thread_guard import ThreadGuard
 from agents.core.message_bus import MessageBus
 from agents.core.metrics import Metrics
+from agents.core.mode import MANUAL, get_mode
 from agents.core.safety import SafetyChecker, SafetyViolation, build_gate_context
 
 logger = logging.getLogger(__name__)
@@ -425,6 +426,14 @@ class AgentProcess(ABC):
         Developer/Reviewer: never gated (they drain the pipeline)
         """
         if self.role == "pm":
+            # MANUAL MODE: the human writes the proposals, so the PM does not.
+            # Enforced here rather than by not starting the agent, so the mode can be
+            # switched while the orchestrator runs without tearing an agent down
+            # mid-message. Every other role is unaffected - a human proposal is an
+            # ordinary proposal and the rest of the pipeline never learns the difference.
+            if await get_mode(self.bus.redis) == MANUAL:
+                logger.debug("Agent %s: manual mode, standing down", self.agent_id)
+                return True
             proposals = await self._active_work_count("proposals")
             designs = await self._active_work_count("designs")
             backlog = proposals + designs

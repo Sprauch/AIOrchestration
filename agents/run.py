@@ -312,6 +312,60 @@ def _render_status_text(snapshot) -> None:
 
 # ── Parser ─────────────────────────────────────────────────
 
+def cmd_propose(args) -> None:
+    """Publish a human-written proposal, from a file or a register/backlog reference."""
+    import asyncio
+
+    from agents.core.config import OrchestratorConfig
+    from agents.core.message import Envelope, MessageType
+    from agents.core.message_bus import MessageBus
+    from agents.propose import (
+        REFERENCE_RE, build_payload, load_proposal_file, load_reference,
+    )
+
+    config = OrchestratorConfig.from_yaml(args.config)
+
+    # A BARE REFERENCE IS THE COMMON CASE. The work worth doing is usually already
+    # written down, with the reasoning attached, in the project's own register or
+    # backlog — so `propose R144` sends that entry rather than a retyping of it.
+    try:
+        if REFERENCE_RE.match(args.file.strip()):
+            data = load_reference(args.file, config.system.working_dir)
+            print(f"Resolved {args.file.strip().upper()} from the project's records")
+        else:
+            data = load_proposal_file(args.file)
+    except ValueError as exc:
+        print(f"error: {exc}")
+        sys.exit(1)
+
+    payload, recipient = build_payload(data)
+
+    async def publish() -> str:
+        bus = MessageBus(config.system.redis_url)
+        await bus.connect()
+        try:
+            kwargs = dict(
+                sender_id="human", sender_role="human",
+                message_type=MessageType.PROPOSAL,
+                payload=payload, recipient_role=recipient,
+            )
+            if args.thread:
+                kwargs["thread_id"] = args.thread
+            env = Envelope(**kwargs)
+            await bus.publish("proposals", env)
+            return env.thread_id
+        finally:
+            await bus.close()
+
+    thread_id = asyncio.run(publish())
+    print(f"Proposal published to {recipient}")
+    print(f"  title  : {payload['title']}")
+    print(f"  thread : {thread_id}")
+    if not args.thread:
+        print("")
+        print(f"  Revise it later with:  propose <file> --thread {thread_id}")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="agent-orchestrator",
@@ -380,6 +434,19 @@ def _build_parser() -> argparse.ArgumentParser:
     p_st.add_argument("--config", default="agents/config.yaml", help="Config file path")
     p_st.add_argument("--json", action="store_true", help="Output as JSON")
     p_st.set_defaults(func=cmd_status)
+
+    p_prop = subparsers.add_parser(
+        "propose",
+        help="Submit a proposal you wrote to the architect (manual mode)",
+    )
+    p_prop.add_argument("file", help="Proposal file (.md or .json)")
+    p_prop.add_argument("--config", default="agents/config.yaml", help="Config file path")
+    p_prop.add_argument(
+        "--thread",
+        help="Continue an existing thread — use this to answer the architect's questions "
+             "with a revision rather than starting a new flow",
+    )
+    p_prop.set_defaults(func=cmd_propose)
 
     return parser
 

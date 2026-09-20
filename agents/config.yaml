@@ -91,10 +91,20 @@ system:
     version_file: null
 
 agents:
+  # Opus at high effort, and this is a change of mind with a reason. The PM was read as a
+  # codebase quality scanner, which sonnet does well enough. It is better understood as
+  # the role that supplies PRODUCT THINKING the user does not have time to do themselves -
+  # in AUTOMATIC mode it decides what is worth building at all, and everything downstream
+  # inherits that judgement. A cheap model here does not save money, it spends the
+  # architect's and the developer's on work that was not worth proposing.
+  #
+  # In MANUAL mode this agent stands down entirely and costs nothing, so the expensive
+  # model is only paid for when it is actually being asked to think.
   pm:
     count: 1
     cli: claude
-    model: sonnet
+    model: opus
+    reasoning_effort: high
     permission_mode: plan
     system_prompt: agents/prompts/pm.md
     subscribes_to: [system, reviews]

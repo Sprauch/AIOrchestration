@@ -22,6 +22,7 @@ from aiohttp import web
 from agents.core.auditor import audit_pipeline
 from agents.core.message import Envelope, MessageType
 from agents.core.message_bus import MessageBus
+from agents.core.mode import MODES, get_mode, set_mode
 from agents.core.redis_keys import _active_keys, _clear_active_work_thread
 from agents.core.state import derive_current_phase, load_snapshot
 from agents.core.supervisor import (
@@ -78,6 +79,9 @@ class WebDashboard:
         app.router.add_get("/api/threads/{thread_id}", self._handle_thread_detail)
         app.router.add_get("/api/agents/{agent_id}", self._handle_agent_detail)
         app.router.add_get("/api/streams/{stream_name}", self._handle_stream_messages)
+        app.router.add_get("/api/mode", self._handle_mode_get)
+        app.router.add_post("/api/mode", self._handle_mode_set)
+        app.router.add_post("/api/proposals", self._handle_submit_proposal)
         app.router.add_get("/api/orchestrator", self._handle_orchestrator_status)
         app.router.add_post("/api/orchestrator/start", self._handle_orchestrator_start)
         app.router.add_get("/api/gates", self._handle_gates)
@@ -1201,6 +1205,121 @@ class WebDashboard:
             headers["Access-Control-Allow-Credentials"] = "true"
             headers["Vary"] = "Origin"
         return headers
+
+
+    # ── Orchestration mode ─────────────────────────────────
+
+    # Which mode is in force decides only ONE thing: whether the PM agent proposes work.
+    # A human proposal is an ordinary proposal envelope and routes by target_area exactly
+    # as the PM's would, so nothing downstream is mode-aware.
+
+    async def _handle_mode_get(self, request: web.Request) -> web.Response:
+        mode = await get_mode(self.bus.redis)
+        return web.json_response({"mode": mode, "modes": list(MODES)})
+
+    async def _handle_mode_set(self, request: web.Request) -> web.Response:
+        """Switch modes while running. Behind the token: this decides who spends money."""
+        if err := self._check_gate_auth(request):
+            return err
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        requested = str(body.get("mode", "")).strip().lower()
+        if requested not in MODES:
+            return web.json_response(
+                {"error": f"mode must be one of: {', '.join(MODES)}"}, status=400,
+            )
+
+        mode = await set_mode(self.bus.redis, requested)
+
+        # Switching back to automatic WAKES THE PM. It stood down by backing off rather
+        # than by dying, so it is still subscribed - but it is waiting on a message that
+        # will never come unless something sends one. Without this, "automatic" would
+        # appear to do nothing until the next restart.
+        woken = False
+        if mode == "automatic":
+            try:
+                await self.bus.publish("system", Envelope(
+                    sender_id="dashboard", sender_role="human",
+                    message_type=MessageType.SYSTEM,
+                    payload={"action": "analyze_codebase",
+                             "reason": "switched to automatic mode"},
+                ))
+                woken = True
+            except Exception:
+                logger.exception("Could not publish PM wake trigger")
+
+        logger.info("Mode set to %s (pm_triggered=%s)", mode, woken)
+        return web.json_response({"mode": mode, "pm_triggered": woken})
+
+    # ── Human-authored proposals ───────────────────────────
+
+    USER_FACING_TARGETS = {
+        "product", "ux", "trust", "onboarding", "workflow", "adoption", "feature",
+    }
+
+    async def _handle_submit_proposal(self, request: web.Request) -> web.Response:
+        """Publish a proposal written by the human, as the PM would have.
+
+        Same envelope, same routing rule, same stream. The architect has never cared who
+        wrote a proposal, which is why manual mode needs no changes downstream.
+
+        Passing `thread_id` continues an existing thread — that is how a revision answers
+        the architect's "needs more information" without starting a new flow.
+        """
+        if err := self._check_gate_auth(request):
+            return err
+        try:
+            body = await request.json()
+        except Exception:
+            return web.json_response({"error": "Invalid JSON"}, status=400)
+
+        title = str(body.get("title", "")).strip()
+        user_problem = str(body.get("user_problem", "")).strip()
+        if not title or not user_problem:
+            return web.json_response(
+                {"error": "title and user_problem are required"}, status=400,
+            )
+
+        target_area = str(body.get("target_area", "product")).strip().lower()
+        payload = {
+            "title": title,
+            "target_area": target_area,
+            "user_problem": user_problem,
+            "description": str(body.get("description", "") or user_problem),
+            "proposed_change": str(body.get("proposed_change", "")),
+            "rationale": str(body.get("rationale", "")),
+            "expected_user_outcome": str(body.get("expected_user_outcome", "")),
+            "success_signal": str(body.get("success_signal", "")),
+            "priority": int(body.get("priority", 2) or 2),
+            "affected_files": list(body.get("affected_files", []) or []),
+            "estimated_effort": str(body.get("estimated_effort", "medium")),
+            "category": str(body.get("category", target_area)),
+        }
+
+        recipient = "product_designer" if target_area in self.USER_FACING_TARGETS else "architect"
+        kwargs = dict(
+            sender_id="human", sender_role="human",
+            message_type=MessageType.PROPOSAL,
+            payload=payload, recipient_role=recipient,
+        )
+        thread_id = str(body.get("thread_id", "") or "").strip()
+        if thread_id:
+            kwargs["thread_id"] = thread_id
+
+        env = Envelope(**kwargs)
+        await self.bus.publish("proposals", env)
+        logger.info(
+            "Human proposal published to %s (thread %s): %s",
+            recipient, env.thread_id[:8], title,
+        )
+        return web.json_response({
+            "published": True,
+            "thread_id": env.thread_id,
+            "recipient_role": recipient,
+        })
 
     async def _handle_orchestrator_status(self, request: web.Request) -> web.Response:
         """Is one running, and may this caller start one?
