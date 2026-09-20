@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import shutil
 import tempfile
 import uuid
@@ -15,9 +16,37 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
+def _native_exe_behind_shim(shim: str) -> str | None:
+    """Return the real .exe an npm .CMD/.BAT shim calls, or None if there is not one.
+
+    The shim is a batch file whose body is a single quoted path plus %*:
+
+        "%dp0%\\node_modules\\@anthropic-ai\\claude-code\\bin\\claude.exe"   %*
+
+    So the target is read out of the shim itself rather than guessed from a package
+    name, and is returned only if it exists on disk.
+    """
+    path = Path(shim)
+    if path.suffix.lower() not in (".cmd", ".bat"):
+        return None
+    try:
+        text = path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+
+    parent = str(path.parent)
+    for quoted in re.findall(r'"([^"\n]+\.exe)"', text, flags=re.IGNORECASE):
+        candidate = quoted.replace("%~dp0", parent + "\\").replace("%dp0%", parent + "\\")
+        if "%" in candidate:  # an expansion we do not understand - do not guess
+            continue
+        if Path(candidate).is_file():
+            return str(Path(candidate))
+    return None
+
+
 @lru_cache(maxsize=8)
 def resolve_cli(name: str) -> str:
-    """Resolve a CLI name to a full path, because Windows cannot execute a bare shim.
+    """Resolve a CLI name to a full path, preferring the native binary over the npm shim.
 
     Both `claude` and `codex` install as npm shims. On Windows that means `claude.CMD`,
     and CreateProcess - which is what subprocess and asyncio use without a shell - cannot
@@ -29,10 +58,33 @@ def resolve_cli(name: str) -> str:
     shutil.which honours PATHEXT, finds the .CMD and returns a path CreateProcess accepts.
     On POSIX it resolves the same name and nothing changes.
 
-    Falls back to the bare name so the caller still raises its own error rather than
-    failing on a None.
+    BUT THE .CMD IS NOT SAFE TO USE, and this is the part that cost real money. A batch
+    file runs under cmd.exe, and A RAW NEWLINE IN AN ARGUMENT ENDS THE CMD.EXE COMMAND
+    LINE. Every system prompt is multi-line, so every flag after --append-system-prompt
+    was silently discarded - no error, no warning, exit code 0. Measured with identical
+    commands differing only in the shape of the prompt:
+
+        system prompt   model actually used   permissionMode   --json-schema
+        none            claude-haiku-4-5      plan             applied
+        single-line     claude-haiku-4-5      plan             applied
+        MULTI-LINE      claude-opus-5         default          DROPPED
+
+    _build_command emits --permission-mode, --model, --effort, --allowedTools and
+    --json-schema after the system prompt, so in every real run all five were lost. The
+    agents ran on the account default model rather than the configured one - which is
+    where the architect's 1.7M tokens went - with no tool restriction, no permission mode
+    and no output schema, which is why the architect invented its own JSON shape and the
+    parser rejected it.
+
+    Executing the .exe the shim calls passes multi-line arguments through intact.
+
+    Falls back to the shim, then to the bare name, so the caller still raises its own
+    error rather than failing on a None.
     """
-    return shutil.which(name) or name
+    found = shutil.which(name)
+    if not found:
+        return name
+    return _native_exe_behind_shim(found) or found
 
 
 class CLISession(ABC):

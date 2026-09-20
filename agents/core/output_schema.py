@@ -233,8 +233,13 @@ def _schema_for_messages(messages: list[dict]) -> dict:
             },
             "required": ["message_type", "recipient_role", "thread_id", "payload"],
         }
+    # NO "$schema" KEY. Declaring draft 2020-12 made the Claude CLI reject the schema
+    # outright - `--json-schema is not a valid JSON Schema: no schema with key or ref
+    # "https://json-schema.org/draft/2020-12/schema"` - because its validator cannot
+    # resolve that meta-schema. Without the key the same schema is accepted and enforced,
+    # and structured_output comes back conforming. The declaration bought nothing: no
+    # consumer dispatched on it.
     return {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "additionalProperties": False,
         "properties": {
