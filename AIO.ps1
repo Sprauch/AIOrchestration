@@ -13,8 +13,10 @@
 #   .\AIO.ps1 check        preflight only; changes nothing
 #   .\AIO.ps1 stop         stop everything AIO started
 #   .\AIO.ps1 token        print the dashboard token and the phone URL
+#   .\AIO.ps1 calib <pct>  record what Claude Code reports as "% used" right now, and
+#                          estimate the weekly allowance from how it moves
 
-param([string]$Command = "start")
+param([string]$Command = "start", [string]$Arg = "")
 
 $ErrorActionPreference = "Stop"
 $Root = $PSScriptRoot
@@ -158,6 +160,96 @@ switch ($Command.ToLower()) {
         Write-Host "The token authorises APPROVE, DENY and STARTING the orchestrator." -ForegroundColor Yellow
         Write-Host "The VIEW is not authenticated at all, which is why this is reached"
         Write-Host "over Tailscale rather than an open port."
+    }
+    "calib" {
+        # CALIBRATING THE WEEKLY ALLOWANCE BY OBSERVATION.
+        #
+        # The limit is not published and the CLI does not expose it, but Claude Code
+        # reports a "% of weekly usage" that moves as tokens are spent. Two readings with
+        # a known number of tokens between them give the whole allowance:
+        #
+        #     allowance = tokens between readings / (percent moved / 100)
+        #
+        # THE CONFOUND THAT DECIDES WHETHER A READING IS USABLE: that percentage covers
+        # the WHOLE PLAN, not just this orchestrator. Any other Claude Code use in the
+        # same window - another project, another session, the one you are reading this in
+        # - moves the percentage without moving AIO's token count, and the estimate comes
+        # out too LOW. Take both readings in a window where AIO is the only thing running.
+        #
+        # PRECISION: a percentage reported in whole numbers carries +/-0.5pp of rounding,
+        # so a 1-point move can be wrong by half. Ten points is worth roughly ten times
+        # more than one; the estimate below reports its own error bar so a thin reading
+        # is visible as thin rather than quoted as fact.
+        $store = Join-Path $env:USERPROFILE ".api\AIO-calibration.json"
+        $pct = 0.0
+        if (-not [double]::TryParse($Arg, [ref]$pct)) {
+            Write-Host "Usage: .\AIO.ps1 calib <percent>" -ForegroundColor Yellow
+            Write-Host "  The percentage Claude Code currently reports as used this week."
+            Write-Host "  Take one reading, run the orchestrator a while, then take another."
+            if (Test-Path $store) {
+                Write-Host ""
+                Write-Host "Readings so far:"
+                (Get-Content $store -Raw | ConvertFrom-Json) | ForEach-Object {
+                    "  {0}  {1,7:N2}%  {2,12:N0} tokens" -f $_.at, $_.percent, $_.tokens
+                }
+            }
+            break
+        }
+
+        try {
+            $snap = (Invoke-WebRequest "http://localhost:8081/api/snapshot" -UseBasicParsing -TimeoutSec 15).Content | ConvertFrom-Json
+        } catch { throw "Dashboard is not running - start it first, it holds the token counts." }
+        $tokens = [int64]$snap.weekly.used
+
+        $obs = @()
+        if (Test-Path $store) { $obs = @((Get-Content $store -Raw | ConvertFrom-Json)) }
+        $obs += [pscustomobject]@{ at = (Get-Date).ToString("s"); percent = $pct; tokens = $tokens }
+        $obs | ConvertTo-Json -Depth 4 | Set-Content $store -Encoding utf8
+
+        Write-Host ""
+        Write-Host ("Recorded: {0:N2}% at {1:N0} tokens this week" -f $pct, $tokens) -ForegroundColor Green
+
+        if ($obs.Count -lt 2) {
+            Write-Host ""
+            Write-Host "That is the first reading. Run the orchestrator for a while, then take"
+            Write-Host "another with a bigger gap - ten percentage points beats one by a lot."
+            break
+        }
+
+        # Use the two readings furthest apart in percentage: the widest gap has the
+        # smallest proportional rounding error, which matters more than recency.
+        $sorted = $obs | Sort-Object percent
+        $lo = $sorted[0]; $hi = $sorted[-1]
+        $dPct = $hi.percent - $lo.percent
+        $dTok = $hi.tokens - $lo.tokens
+
+        if ($dPct -le 0 -or $dTok -le 0) {
+            Write-Host ""
+            Write-Host "Cannot estimate yet: the percentage or the token count has not risen" -ForegroundColor Yellow
+            Write-Host "between readings. If the weekly window reset, delete $store and start over."
+            break
+        }
+
+        $est = [math]::Round($dTok / ($dPct / 100.0))
+        # Rounding of +/-0.5pp on each reading bounds the error on the difference.
+        $estLo = [math]::Round($dTok / (($dPct + 1.0) / 100.0))
+        $estHi = [math]::Round($dTok / ([math]::Max($dPct - 1.0, 0.1) / 100.0))
+
+        Write-Host ""
+        Write-Host ("Between readings: {0:N0} tokens moved the meter {1:N2} points" -f $dTok, $dPct)
+        Write-Host ""
+        Write-Host ("  ESTIMATED WEEKLY ALLOWANCE   {0:N0} tokens" -f $est) -ForegroundColor Cyan
+        Write-Host ("  plausible range              {0:N0} - {1:N0}" -f $estLo, $estHi)
+        Write-Host ""
+        if ($dPct -lt 5) {
+            Write-Host "THIN READING. Under five points the range above is wide enough to be" -ForegroundColor Yellow
+            Write-Host "misleading. Take another reading after more use before trusting it."
+        }
+        Write-Host "Set it in agents/config.yaml:"
+        Write-Host ("  weekly_token_budget: {0}" -f $est)
+        Write-Host ""
+        Write-Host "This assumes AIO was the only thing spending your plan between readings."
+        Write-Host "If it was not, the real allowance is HIGHER than the estimate."
     }
     "stop" {
         # Only the windows AIO opened: matched on the title set in Start-Piece, so an
