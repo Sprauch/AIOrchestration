@@ -426,10 +426,10 @@ class AgentProcess(ABC):
         Developer/Reviewer: never gated (they drain the pipeline)
         """
         if self.role == "pm":
-            # MANUAL MODE: the human writes the proposals, so the PM does not.
+            # MANUAL MODE: a person writes the proposals, so the PM does not.
             # Enforced here rather than by not starting the agent, so the mode can be
             # switched while the orchestrator runs without tearing an agent down
-            # mid-message. Every other role is unaffected - a human proposal is an
+            # mid-message. Every other role is unaffected - such a proposal is an
             # ordinary proposal and the rest of the pipeline never learns the difference.
             if await get_mode(self.bus.redis) == MANUAL:
                 logger.debug("Agent %s: manual mode, standing down", self.agent_id)

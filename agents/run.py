@@ -345,7 +345,7 @@ def cmd_propose(args) -> None:
         await bus.connect()
         try:
             kwargs = dict(
-                sender_id="human", sender_role="human",
+                sender_id="person", sender_role="person",
                 message_type=MessageType.PROPOSAL,
                 payload=payload, recipient_role=recipient,
             )

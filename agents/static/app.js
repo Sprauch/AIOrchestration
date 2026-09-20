@@ -355,10 +355,28 @@ async function refreshOverview() {
       // Only when genuinely down. Not while connecting: the start is already in flight,
       // and a second click would be refused by the server anyway - offering it invites a
       // person to believe the first one failed.
-      const startBtn=(statusClass==='bad')
-        ? '<div class="brief-action"><button id="btn-start-orch" onclick="startOrchestrator()">Start orchestrator</button>'
-          +'<span id="start-orch-msg"></span></div>'
+      // The mode toggle and the proposal form sit beside the start button and are ALWAYS
+      // available, including while the orchestrator is stopped. That is not a compromise:
+      // Redis is a service in its own right, and agents replay each stream from the
+      // beginning, so a proposal queued now is picked up whenever the orchestrator next
+      // starts. Deciding what should happen and starting the machine that does it are
+      // separate acts, and the first should not wait on the second.
+      // Unknown until the mode arrives — better than showing a mode that may be wrong
+      // and flipping a moment later.
+      const mode=window.orchMode||null;
+      const modeLabel=mode===null?'…':(mode==='manual'?'Manual':'Automatic');
+      const modeBtn='<button id="btn-mode" class="ctl-mode ctl-'+(mode||'unknown')+'"'
+        +(mode===null?' disabled':'')+' onclick="toggleMode()"'
+        +' title="'+(mode==='manual'
+          ? 'You write the proposals. The PM agent stands down.'
+          : 'The PM agent proposes work. Switch to Manual to write proposals yourself.')
+        +'">'+modeLabel+'</button>';
+      const proposeBtn='<button id="btn-propose" class="ctl-propose" onclick="openProposalForm()">New proposal</button>';
+      const startCtl=(statusClass==='bad')
+        ? '<button id="btn-start-orch" onclick="startOrchestrator()">Start orchestrator</button>'
         : '';
+      const startBtn='<div class="brief-action">'+startCtl+modeBtn+proposeBtn
+        +'<span id="start-orch-msg"></span></div>';
       sb.innerHTML=startBtn+'<div class="brief brief-'+statusClass+'"><div class="brief-dot"></div><div class="brief-text">'+parts.join(' ')+'</div></div>';
     }
 
@@ -1079,6 +1097,142 @@ async function gateAction(id,action){const h={method:'POST'};const hdrs=authHead
 // ── Orchestrator control ──
 // Follows the same token pattern as gateAction: stored in localStorage, prompted for on
 // 401, retried once. That means pairing a phone once works for approvals AND for this.
+// ── Orchestration mode ──
+// Which mode is in force decides ONE thing: whether the PM agent proposes work.
+// Available whether or not the orchestrator is running — Redis holds the setting, and
+// the orchestrator reads it when it starts.
+async function refreshMode(){
+  try{
+    const d=await (await fetch('/api/mode')).json();
+    if(d&&d.mode)window.orchMode=d.mode;
+  }catch(e){}
+}
+
+async function toggleMode(){
+  const btn=document.getElementById('btn-mode');
+  const msg=document.getElementById('start-orch-msg');
+  const next=(window.orchMode==='manual')?'automatic':'manual';
+  if(btn){btn.disabled=true;btn.textContent='...';}
+  try{
+    const h={method:'POST',body:JSON.stringify({mode:next})};
+    const hdrs=authHeaders();
+    h.headers=Object.assign({'Content-Type':'application/json'},hdrs||{});
+    const r=await fetch('/api/mode',h);
+    if(r.status===401){
+      const t=prompt('Dashboard token required. Run  .\\AIO.ps1 pair  and paste the token:');
+      if(t&&isValidToken(t.trim())){localStorage.setItem('gate_token',t.trim());return toggleMode();}
+      if(msg)msg.textContent='cancelled';
+      if(btn)btn.disabled=false;
+      return;
+    }
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){if(msg)msg.textContent=d.error||('failed (HTTP '+r.status+')');if(btn)btn.disabled=false;return;}
+    window.orchMode=d.mode;
+    if(msg)msg.textContent=(d.mode==='manual')
+      ? 'Manual: you write the proposals.'
+      : (d.pm_triggered?'Automatic: the PM has been asked for proposals.':'Automatic.');
+    if(typeof refreshOverview==='function')refreshOverview();
+  }catch(e){
+    if(msg)msg.textContent='failed: '+e.message;
+    if(btn)btn.disabled=false;
+  }
+}
+
+// ── Proposal form ──
+// Every field the architect and product designer actually read, none of them required.
+// A thin proposal costs a question, not a defect — the architect can infer from the
+// codebase, and asks when it cannot.
+const PROPOSAL_FIELDS=[
+  {k:'title',       l:'Title',                 t:'text',     ph:'A headline, not a sentence', hint:'Read on a phone, in a list.'},
+  {k:'user_problem',l:'User problem',          t:'textarea', ph:"Whose problem is it, and what happens to them today?", hint:'The one field worth writing properly — it is what the architect judges against.'},
+  {k:'proposed_change',l:'Proposed change',    t:'textarea', ph:'What you think should change. Leave blank to let the architect propose the approach.'},
+  {k:'expected_user_outcome',l:'Expected outcome',t:'textarea',ph:'What is different for the user afterwards'},
+  {k:'rationale',   l:'Rationale',             t:'textarea', ph:'Why now, why this way, what you already ruled out'},
+  {k:'success_signal',l:'Success signal',      t:'text',     ph:'How you would know it worked'},
+  {k:'affected_files',l:'Affected files',      t:'textarea', ph:'One per line. Optional — the architect will find them.'}
+];
+const TARGET_AREAS=['product','ux','trust','reliability','technical','cost','onboarding','workflow'];
+
+function openProposalForm(threadId, prefill){
+  if(document.getElementById('proposal-modal'))return;
+  const p=prefill||{};
+  const fields=PROPOSAL_FIELDS.map(f=>{
+    const v=esc(p[f.k]||'');
+    const input=(f.t==='textarea')
+      ? '<textarea id="pf-'+f.k+'" rows="'+(f.k==='user_problem'?5:3)+'" placeholder="'+esc(f.ph)+'">'+v+'</textarea>'
+      : '<input id="pf-'+f.k+'" type="text" value="'+v+'" placeholder="'+esc(f.ph)+'">';
+    return '<label class="pf-row"><span class="pf-label">'+esc(f.l)+'</span>'+input
+      +(f.hint?'<span class="pf-hint">'+esc(f.hint)+'</span>':'')+'</label>';
+  }).join('');
+  const areas=TARGET_AREAS.map(a=>'<option value="'+a+'"'+(p.target_area===a?' selected':'')+'>'+a+'</option>').join('');
+  const banner=threadId
+    ? '<div class="pf-banner">Revising thread '+esc(threadId.slice(0,8))+' — this answers the architect rather than starting a new flow.</div>'
+    : '';
+  const html='<div id="proposal-modal" class="pf-backdrop"><div class="pf-card">'
+    +'<div class="pf-head"><strong>New proposal</strong>'
+    +'<button class="pf-close" onclick="closeProposalForm()">Close</button></div>'
+    +banner
+    +'<div class="pf-intro">Nothing here is required. The architect reads the codebase and '
+    +'will ask for what it cannot infer.</div>'
+    +fields
+    +'<label class="pf-row"><span class="pf-label">Target area</span>'
+    +'<select id="pf-target_area">'+areas+'</select>'
+    +'<span class="pf-hint">User-facing areas go to the product designer first, the rest straight to the architect.</span></label>'
+    +'<label class="pf-row"><span class="pf-label">Priority</span>'
+    +'<select id="pf-priority">'+[1,2,3,4,5].map(n=>'<option value="'+n+'"'+((p.priority||2)===n?' selected':'')+'>'+n+'</option>').join('')+'</select></label>'
+    +'<div class="pf-actions"><span id="pf-msg"></span>'
+    +'<button class="pf-submit" onclick="submitProposal('+(threadId?"'"+threadId+"'":'null')+')">Send to architect</button></div>'
+    +'</div></div>';
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function closeProposalForm(){
+  const m=document.getElementById('proposal-modal');
+  if(m)m.remove();
+}
+
+async function submitProposal(threadId){
+  const msg=document.getElementById('pf-msg');
+  const val=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
+  const body={
+    title:val('pf-title'),
+    user_problem:val('pf-user_problem'),
+    proposed_change:val('pf-proposed_change'),
+    expected_user_outcome:val('pf-expected_user_outcome'),
+    rationale:val('pf-rationale'),
+    success_signal:val('pf-success_signal'),
+    affected_files:val('pf-affected_files').split('\n').map(s=>s.trim()).filter(Boolean),
+    target_area:val('pf-target_area')||'product',
+    priority:parseInt(val('pf-priority')||'2',10)
+  };
+  if(threadId)body.thread_id=threadId;
+  if(msg)msg.textContent='sending...';
+  try{
+    const hdrs=authHeaders();
+    const r=await fetch('/api/proposals',{
+      method:'POST',
+      headers:Object.assign({'Content-Type':'application/json'},hdrs||{}),
+      body:JSON.stringify(body)
+    });
+    if(r.status===401){
+      const t=prompt('Dashboard token required. Run  .\\AIO.ps1 pair  and paste the token:');
+      if(t&&isValidToken(t.trim())){localStorage.setItem('gate_token',t.trim());return submitProposal(threadId);}
+      if(msg)msg.textContent='cancelled';
+      return;
+    }
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){if(msg)msg.textContent=d.error||('failed (HTTP '+r.status+')');return;}
+    closeProposalForm();
+    const where=(d.recipient_role==='product_designer')?'the product designer':'the architect';
+    const started=(window.orchMode==='manual'||true);
+    const note=document.getElementById('start-orch-msg');
+    if(note)note.textContent='Proposal queued for '+where+' (thread '+d.thread_id.slice(0,8)+').';
+    if(typeof refreshOverview==='function')refreshOverview();
+  }catch(e){
+    if(msg)msg.textContent='failed: '+e.message;
+  }
+}
+
 async function startOrchestrator(){
   const btn=document.getElementById('btn-start-orch');
   const msg=document.getElementById('start-orch-msg');
@@ -1383,6 +1537,12 @@ function authHeaders(){
 })();
 
 // ── Init ──
+// Mode and snapshot are fetched IN PARALLEL. Chaining them put a second round trip in
+// front of the first paint, so the page sat on "waiting for the orchestrator" for as
+// long as two sequential requests took — a slower dashboard to avoid one wrong-looking
+// button. The button renders as unknown until the mode arrives instead, which is honest
+// and costs nothing.
+refreshMode();
 refreshOverview();
-setInterval(refreshOverview,5000);
+setInterval(()=>{refreshMode();refreshOverview();},5000);
 window.addEventListener('resize',()=>{if(lastSnap){renderPipelineMini(lastSnap.agents,lastSnap.challengers||{},lastSnap.backpressure);renderPipelineFull(lastSnap.agents,lastSnap.challengers||{},lastSnap.backpressure);}});

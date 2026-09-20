@@ -1,4 +1,4 @@
-"""Submit a human-written proposal to the architect, from a file.
+"""Submit a proposal to the architect from a file.
 
 THE OTHER HALF OF MANUAL MODE. The dashboard form is for when you are away from the
 machine; this is for a proposal worth writing properly, in an editor, in a file you can

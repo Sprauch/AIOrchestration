@@ -1339,3 +1339,55 @@ tr.click { cursor: pointer; }
 }
 .ot-row b { color: var(--text); font-weight: 600; font-family: var(--mono); font-size: 11.5px; }
 .ot-row-hint { color: var(--subtle); font-size: 11px; font-style: italic; }
+
+/* ── Mode toggle and proposal form ──────────────────────────────────────────
+   Both sit beside the start button and are available while the orchestrator is
+   stopped: Redis holds the queue, so deciding what should happen does not wait on
+   starting the machine that does it. */
+.brief-action .ctl-mode, .brief-action .ctl-propose {
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  padding: 7px 14px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text);
+}
+.brief-action .ctl-mode:hover, .brief-action .ctl-propose:hover { border-color: var(--dim); }
+.brief-action .ctl-mode.ctl-manual { border-color: var(--blue); color: var(--blue); }
+.brief-action .ctl-mode.ctl-automatic { border-color: var(--green); color: var(--green); }
+.brief-action .ctl-mode::before { content: 'Mode: '; font-weight: 400; color: var(--dim); }
+
+.pf-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 32px 16px; overflow-y: auto; z-index: 500;
+}
+.pf-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  width: 100%; max-width: 640px; padding: 20px;
+}
+.pf-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.pf-close {
+  font-family: inherit; font-size: 12px; padding: 5px 12px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 6px; background: transparent; color: var(--dim);
+}
+.pf-intro, .pf-banner { font-size: 12px; color: var(--dim); margin-bottom: 14px; line-height: 1.5; }
+.pf-banner { color: var(--blue); }
+.pf-row { display: block; margin-bottom: 14px; }
+.pf-label { display: block; font-size: 11px; font-weight: 600; margin-bottom: 4px; color: var(--text); }
+.pf-hint { display: block; font-size: 11px; color: var(--subtle); margin-top: 4px; line-height: 1.4; }
+.pf-row input, .pf-row textarea, .pf-row select {
+  width: 100%; box-sizing: border-box; font-family: inherit; font-size: 13px;
+  padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+  background: var(--bg); color: var(--text); resize: vertical;
+}
+.pf-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 4px; }
+#pf-msg { font-size: 12px; color: var(--dim); margin-right: auto; }
+.pf-submit {
+  font-family: inherit; font-size: 13px; font-weight: 600; padding: 9px 18px;
+  border-radius: 6px; cursor: pointer; border: 1px solid var(--green);
+  background: var(--green); color: var(--surface);
+}
+
+@media (max-width: 560px) {
+  .pf-backdrop { padding: 12px 8px; }
+  .pf-card { padding: 14px; }
+  .brief-action { flex-wrap: wrap; gap: 8px; }
+}

@@ -276,8 +276,36 @@ class WebDashboard:
         except Exception as e:
             return web.json_response({"error": str(e)}, status=500)
 
-    async def _handle_index(self, request: web.Request) -> web.FileResponse:
-        return web.FileResponse(STATIC_DIR / "index.html")
+    async def _handle_index(self, request: web.Request) -> web.Response:
+        """Serve the page with its assets versioned by their own modification time.
+
+        WHY THIS EXISTS. index.html references /static/style.css and /static/app.js with
+        no version, so a browser holding them cached keeps using them and an edit to
+        either simply does not arrive. That cost real time more than once: a CSS rule was
+        written correctly, served correctly, fetched correctly, and still had no effect on
+        the open page — which reads exactly like a rule that does not work.
+
+        The mtime changes when the file changes and never otherwise, so the cache keeps
+        working; it just cannot serve a stale copy of something that has been edited.
+        """
+        html = (STATIC_DIR / "index.html").read_text(encoding="utf-8")
+        for asset in ("style.css", "app.js"):
+            try:
+                version = int((STATIC_DIR / asset).stat().st_mtime)
+            except OSError:
+                continue
+            html = html.replace(f"/static/{asset}", f"/static/{asset}?v={version}")
+        # THE PAGE ITSELF MUST NOT BE CACHED. It is the only thing that knows which
+        # version of each asset to ask for, so a cached copy pins the browser to whatever
+        # they were when it was stored. That is exactly what happened while building this:
+        # the versioning was correct and served correctly and still had no effect, because
+        # the page carrying it came from cache. The assets can be cached hard now — they
+        # are versioned.
+        return web.Response(
+            text=html,
+            content_type="text/html",
+            headers={"Cache-Control": "no-cache, must-revalidate"},
+        )
 
     # ── API handlers ───────────────────────────────────────
 
@@ -607,6 +635,7 @@ class WebDashboard:
             t = threads[tid]
             t["events"] += 1
             t["last_type"] = env.message_type.value
+            t["last_sender_role"] = env.sender_role
             t["last_timestamp"] = env.timestamp
             t["last_time"] = env.timestamp[11:19] if len(env.timestamp) > 19 else env.timestamp
 
@@ -835,7 +864,15 @@ class WebDashboard:
             elif t["last_type"] == "proposal":
                 latest_change = {
                     "kind": "proposal",
-                    "summary": "PM submitted a proposal",
+                    # Saying "PM" for a manually submitted proposal is not a cosmetic
+                    # slip: it credits an agent for a decision made by hand, and makes it
+                    # impossible to tell from the feed which proposals were asked for and
+                    # which were volunteered.
+                    "summary": (
+                        "Manually submitted proposal"
+                        if t.get("last_sender_role") == "person"
+                        else "PM submitted a proposal"
+                    ),
                     "detail": "Architect review is next.",
                     "time": t["last_time"],
                     "timestamp": t["last_timestamp"],
@@ -1242,7 +1279,7 @@ class WebDashboard:
         if mode == "automatic":
             try:
                 await self.bus.publish("system", Envelope(
-                    sender_id="dashboard", sender_role="human",
+                    sender_id="dashboard", sender_role="person",
                     message_type=MessageType.SYSTEM,
                     payload={"action": "analyze_codebase",
                              "reason": "switched to automatic mode"},
@@ -1254,17 +1291,17 @@ class WebDashboard:
         logger.info("Mode set to %s (pm_triggered=%s)", mode, woken)
         return web.json_response({"mode": mode, "pm_triggered": woken})
 
-    # ── Human-authored proposals ───────────────────────────
+    # ── Manually submitted proposals ───────────────────────
 
     USER_FACING_TARGETS = {
         "product", "ux", "trust", "onboarding", "workflow", "adoption", "feature",
     }
 
     async def _handle_submit_proposal(self, request: web.Request) -> web.Response:
-        """Publish a proposal written by the human, as the PM would have.
+        """Publish a proposal written by a person, as the PM would have.
 
-        Same envelope, same routing rule, same stream. The architect has never cared who
-        wrote a proposal, which is why manual mode needs no changes downstream.
+        Same envelope, same routing rule, same stream. The architect has never cared how
+        a proposal arrived, which is why manual mode needs no changes downstream.
 
         Passing `thread_id` continues an existing thread — that is how a revision answers
         the architect's "needs more information" without starting a new flow.
@@ -1276,12 +1313,20 @@ class WebDashboard:
         except Exception:
             return web.json_response({"error": "Invalid JSON"}, status=400)
 
+        # NOTHING IS MANDATORY except that the proposal is not empty. The architect has
+        # the codebase in front of it and can infer a great deal; where it cannot, asking
+        # is a better use of its context than a form refusing to submit. The human is the
+        # quality gate either way, so a thin proposal costs a question, not a defect.
         title = str(body.get("title", "")).strip()
         user_problem = str(body.get("user_problem", "")).strip()
-        if not title or not user_problem:
+        if not title and not user_problem:
             return web.json_response(
-                {"error": "title and user_problem are required"}, status=400,
+                {"error": "give it a title, or at least say what the problem is"},
+                status=400,
             )
+        if not title:
+            # Still needs a handle: every view names a proposal by its title.
+            title = user_problem.split("\n")[0][:120]
 
         target_area = str(body.get("target_area", "product")).strip().lower()
         payload = {
@@ -1301,7 +1346,7 @@ class WebDashboard:
 
         recipient = "product_designer" if target_area in self.USER_FACING_TARGETS else "architect"
         kwargs = dict(
-            sender_id="human", sender_role="human",
+            sender_id="person", sender_role="person",
             message_type=MessageType.PROPOSAL,
             payload=payload, recipient_role=recipient,
         )

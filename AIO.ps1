@@ -263,8 +263,28 @@ switch ($Command.ToLower()) {
             ForEach-Object { Stop-Process -Id $_.Id -Force; $killed++ }
         Write-Host "Stopped $killed AIO process(es). Memurai keeps running - it is a service."
     }
-    default {
+    "propose" {
+        # The explicit form:  .\AIO.ps1 propose <file.md | R144 | B67>
         Assert-Ready
-        & $Python -m agents $Command --config agents/config.yaml
+        if (-not $Arg) {
+            Write-Host "Usage: .\AIO.ps1 propose <file.md | R144 | B67>"
+            exit 1
+        }
+        & $Python -m agents propose $Arg --config agents/config.yaml
+    }
+    default {
+        # A BARE REFERENCE IS A COMMAND IN ITSELF:  .\AIO.ps1 R144
+        #
+        # The work worth doing is usually already written down in the register or the
+        # backlog, so naming it should be the whole instruction. Anything shaped like
+        # R<number> or B<number> is a proposal rather than a mistyped subcommand, and
+        # reading it that way costs nothing because no subcommand looks like that.
+        Assert-Ready
+        if ($Command -match '^[RrBb]\d+$') {
+            & $Python -m agents propose $Command --config agents/config.yaml
+        }
+        else {
+            & $Python -m agents $Command --config agents/config.yaml
+        }
     }
 }
