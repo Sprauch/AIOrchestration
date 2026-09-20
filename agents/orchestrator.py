@@ -534,6 +534,19 @@ class Orchestrator:
             pass
 
     def _install_signal_handlers(self) -> None:
+        """Install graceful-shutdown handlers, by whichever mechanism the platform has.
+
+        WINDOWS. asyncio's ProactorEventLoop does not implement add_signal_handler and
+        raises NotImplementedError, which crashed the orchestrator during startup - after
+        preflight passed and Redis connected, so it looked like a working system that died
+        for no stated reason. It meant the orchestrator could not start on Windows at all,
+        by any entry point.
+
+        signal.signal() works there instead. It runs the handler in the main thread rather
+        than on the loop, so the shutdown coroutine is scheduled thread-safely rather than
+        created directly - asyncio.create_task from outside the loop is undefined
+        behaviour, and this is exactly the path a Ctrl+C takes.
+        """
         loop = asyncio.get_event_loop()
 
         def _handle_signal() -> None:
@@ -542,7 +555,24 @@ class Orchestrator:
                 asyncio.create_task(self.shutdown())
 
         for sig in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(sig, _handle_signal)
+            try:
+                loop.add_signal_handler(sig, _handle_signal)
+            except NotImplementedError:
+                # Windows. Bridge the OS handler back onto the loop.
+                def _threaded(signum, _frame, _loop=loop):
+                    if not self._shutdown_triggered:
+                        self._shutdown_triggered = True
+                        asyncio.run_coroutine_threadsafe(self.shutdown(), _loop)
+
+                try:
+                    signal.signal(sig, _threaded)
+                except (ValueError, OSError, AttributeError) as exc:
+                    # Not fatal: without a handler the process still stops, it just stops
+                    # abruptly. Losing a graceful shutdown must not cost the whole run.
+                    logger.warning(
+                        "No shutdown handler for %s on this platform (%s); "
+                        "shutdown will not be graceful.", sig, exc,
+                    )
 
     _REPAIR_LOCK_KEY = "orchestrator:repair_lock"
 
