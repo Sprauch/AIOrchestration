@@ -26,6 +26,9 @@
       <span class="nav-label">Actions</span>
       <span class="nav-badge" id="nav-exc-count" style="display:none">0</span>
     </div>
+    <div class="nav-item" data-view="retros">
+      <span class="nav-label">Retros</span>
+    </div>
     <div class="nav-item" data-view="system">
       <span class="nav-label">Diagnostics</span>
     </div>
@@ -145,6 +148,128 @@
            restarted or left alone, so this is the one section expected to grow
            without bound — anything above it would be pushed off the screen. -->
       <div id="refused-work"></div>
+    </div>
+
+    <!-- RETROS -->
+    <div class="view" id="view-retros">
+      <p class="view-desc">What the work cost, why, and what would be worth changing about it.</p>
+
+      <!-- The purpose is stated on the page because it is the thing most easily lost. The
+           retrospective does not exist to find faults and fix them; it exists so that a
+           proposal to change something can be argued from the risk a root cause carries
+           OVER TIME against the cost and the risk of the change itself. Without that
+           balance, every finding reads as urgent and the expensive ones are indistinguishable
+           from the cheap ones. -->
+      <div class="retro-purpose">
+        <strong>Why this exists:</strong> not to fix what went wrong, but to decide what is
+        worth changing. A root cause area is worth addressing when the risk it carries over
+        time outweighs the effort of the change and the risk the change itself introduces.
+        Fixing immediately, without that balance, spends the most on whatever failed most
+        recently.
+      </div>
+
+      <div class="sub-tabs">
+        <button class="sub-tab active" data-sub="retro-overview">Overview</button>
+        <button class="sub-tab" data-sub="retro-impact">Impact</button>
+        <button class="sub-tab" data-sub="retro-causes">Root Cause</button>
+        <button class="sub-tab" data-sub="retro-improvements">Improvements</button>
+      </div>
+
+      <div class="sub-view active" id="retro-overview">
+        <div class="card">
+          <div class="card-head"><h3>Reviewed work, by impact</h3></div>
+          <div class="card-body">
+            <div id="retro-overview-body" class="retro-pending">
+              <p>Threads that have been through a retrospective, ordered by the size of the
+                 impact found, with anything currently under review shown alongside.</p>
+              <p class="retro-await">Waiting on the retrospective role, which arrives in stage two.</p>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:16px">
+          <div class="card-head"><h3>The specification, as given</h3></div>
+          <div class="card-body">
+            <!-- Kept verbatim on the page, not paraphrased into a doc, because this is the
+                 reference to build against and a paraphrase is where intent goes missing.
+                 The calculations are deliberately absent: they are to be defined later. -->
+            <p class="retro-spec-note">Recorded 2026-09-21, in the user's own words. The
+              calculations behind these numbers are to be defined later; the structure is
+              fixed now so the retrospective role has somewhere to put its output.</p>
+
+            <ol class="retro-spec">
+              <li><strong>Overview</strong> — list threads that have been reviewed along with
+                their respective impact (ordered by size of impact), and show any threads
+                currently under review.</li>
+              <li><strong>Impact</strong> — show for each thread reviewed the impact found,
+                with the ability to drill down in what context it happened in.</li>
+              <li><strong>Root Cause</strong> — list Root Causes identified per thread, along
+                with assigned impact value per root cause. Provide an overview of Root Cause
+                Areas (bundled Root Causes), as well as the frequency of recurrence of these
+                root cause areas over time, and the total cost impact they've had.</li>
+              <li><strong>Improvements</strong> — list improvements intended to address
+                individual root causes, ordered by size of total impact of the root cause
+                area the root causes belong to.</li>
+            </ol>
+
+            <div class="retro-spec-purpose">
+              <div class="retro-spec-purpose-label">The key purpose</div>
+              <p>“The key purpose of the retro agent and the information it generates is to be
+                able to create proposals that address these root cause areas based on the risk
+                they present over time vs the cost effort of making the change and the risk
+                associated with the change itself, rather than immediately fixing things
+                without understanding that balance of risk vs value.”</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-view" id="retro-impact">
+        <div class="card">
+          <div class="card-head"><h3>Impact found, per thread</h3></div>
+          <div class="card-body">
+            <div id="retro-impact-body" class="retro-pending">
+              <p>The impact found for each reviewed thread, and the context it happened in:
+                 what was being attempted, what it cost, and what made it cost that.</p>
+              <p class="retro-await">Waiting on the retrospective role, which arrives in stage two.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-view" id="retro-causes">
+        <div class="card">
+          <div class="card-head"><h3>Root causes, and the areas they group into</h3></div>
+          <div class="card-body">
+            <div id="retro-causes-body" class="retro-pending">
+              <p>Root causes identified per thread with an impact value assigned to each,
+                 then grouped into <strong>root cause areas</strong>. An area carries three
+                 numbers: how often it recurs, over what period, and what it has cost in
+                 total.</p>
+              <p>The grouping is the point. One thread's root cause is an anecdote; the same
+                 cause appearing across six threads over two months is a case for changing
+                 something structural.</p>
+              <p class="retro-await">Waiting on the retrospective role, which arrives in stage two.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="sub-view" id="retro-improvements">
+        <div class="card">
+          <div class="card-head"><h3>Improvements worth proposing</h3></div>
+          <div class="card-body">
+            <div id="retro-improvements-body" class="retro-pending">
+              <p>Improvements intended to address individual root causes, ordered by the
+                 total impact of the <em>area</em> the cause belongs to rather than by the
+                 impact of any single incident.</p>
+              <p>This ordering is deliberate: the loudest recent failure is rarely the most
+                 expensive one. An improvement here is a candidate for a proposal, weighed on
+                 risk over time against cost and change risk — not a queue of fixes.</p>
+              <p class="retro-await">Waiting on the retrospective role, which arrives in stage two.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- SYSTEM -->

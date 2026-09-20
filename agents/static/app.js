@@ -114,7 +114,7 @@ function formatReviewRequest(p) {
 }
 
 // ── Navigation ──
-const viewTitles = {overview:'Overview',work:'Workflow',exceptions:'Actions',system:'Diagnostics'};
+const viewTitles = {overview:'Overview',work:'Workflow',exceptions:'Actions',retros:'Retros',system:'Diagnostics'};
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>switchView(n.dataset.view)));
 function switchView(name) {
   // Decision Gates lives on Actions now: the rules belong beside the decisions
@@ -137,8 +137,12 @@ function switchView(name) {
 }
 // Sub-tabs within System
 document.querySelectorAll('.sub-tab').forEach(t=>t.addEventListener('click',function(){
-  document.querySelectorAll('.sub-tab').forEach(x=>x.classList.remove('active'));
-  document.querySelectorAll('.sub-view').forEach(v=>v.classList.remove('active'));
+  // SCOPED TO THIS VIEW. It used to clear every .sub-tab and .sub-view in the document,
+  // which worked only while one view had sub-tabs: with two, switching to the other set
+  // and back left the first showing no sub-view at all.
+  const view=this.closest('.view')||document;
+  view.querySelectorAll('.sub-tab').forEach(x=>x.classList.remove('active'));
+  view.querySelectorAll('.sub-view').forEach(v=>v.classList.remove('active'));
   this.classList.add('active');
   document.getElementById(this.dataset.sub).classList.add('active');
   if(this.dataset.sub==='sys-agents'&&lastSnap) setTimeout(()=>renderPipelineFull(lastSnap.agents,lastSnap.challengers||{},lastSnap.backpressure),50);
