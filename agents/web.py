@@ -24,7 +24,13 @@ from agents.core.message import Envelope, MessageType
 from agents.core.message_bus import MessageBus
 from agents.core.redis_keys import _active_keys, _clear_active_work_thread
 from agents.core.state import derive_current_phase, load_snapshot
-from agents.core.supervisor import SupervisorError, is_running, spawn_orchestrator
+from agents.core.supervisor import (
+    SupervisorError,
+    clear_start_failure,
+    is_running,
+    last_start_failure,
+    spawn_orchestrator,
+)
 from agents.core.thread_guard import THREAD_CYCLES_KEY
 
 logger = logging.getLogger(__name__)
@@ -277,6 +283,12 @@ class WebDashboard:
         except Exception:
             return web.json_response({"error": "Redis unreachable"}, status=503)
         data = asdict(snapshot)
+
+        # Why the last start died, if it did. Carried on the snapshot so a phone that
+        # reloads - or a second tab that never clicked the button - still sees the reason
+        # instead of a bare "disconnected". Added here rather than on the shared Snapshot
+        # dataclass, which the terminal monitor and the CLI also read and neither needs.
+        data["orchestrator_start_error"] = last_start_failure() or ""
 
         # Weekly token usage against the plan allowance. The dashboard renders a ratio
         # rather than an amount, because on a subscription "tokens used / tokens
@@ -1195,10 +1207,17 @@ class WebDashboard:
         one that fails - a button that looks available and is not is worse than no button.
         """
         running = await is_running(self.bus.redis)
+        # A start that died reads exactly like a start still in progress - no heartbeat
+        # either way - so the UI sat on "starting" until its own timeout and never said
+        # why. Only meaningful while not running: once the heartbeat is up, an earlier
+        # failed attempt is history.
+        failure = None if running else last_start_failure()
         return web.json_response({
             "running": running,
             "can_start": not running,
             "reason": "already running" if running else "",
+            "failed": bool(failure),
+            "error": failure or "",
             "auth_required": bool(self.gate_token),
         })
 
@@ -1218,6 +1237,9 @@ class WebDashboard:
             return web.json_response(
                 {"started": False, "error": "an orchestrator is already running"}, status=409,
             )
+
+        # A previous attempt's failure must not describe this one.
+        clear_start_failure()
 
         try:
             pid = spawn_orchestrator()

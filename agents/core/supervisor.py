@@ -39,6 +39,22 @@ class SupervisorError(RuntimeError):
     """Raised when the orchestrator cannot be started. Carries a message for the UI."""
 
 
+# The most recent child this process spawned, and where its output went.
+#
+# NOT A PID FILE - the module docstring rejects those, and rightly: a pid on disk goes
+# stale and cannot tell one project's orchestrator from another's. This is the live Popen
+# handle, held by the web server that created the child, so poll() is authoritative about
+# THAT process and nothing has to be believed from disk.
+#
+# It exists because the heartbeat cannot answer "did the start fail?". A start that dies
+# in preflight and a start still working through preflight both show no heartbeat, and
+# the dashboard reported both as "starting" until its own 60-second timeout gave up
+# without ever saying why. Lost on a dashboard restart, which is correct: with no start
+# in flight, the heartbeat is the whole truth again.
+_last_spawn: subprocess.Popen | None = None
+_last_spawn_log: Path | None = None
+
+
 async def is_running(redis, stale_after: int = HEARTBEAT_STALE_AFTER) -> bool:
     """Is an orchestrator alive, according to the heartbeat the dashboard already reads?"""
     try:
@@ -89,11 +105,18 @@ def spawn_orchestrator(config_path: str = "agents/config.yaml") -> int:
     log_path = log_dir / "orchestrator-spawn.log"
     log_handle = open(log_path, "w", encoding="utf-8", errors="replace")
 
+    # Force UTF-8 on the child's output. Without it Python encodes to the console codepage
+    # - cp1252 here - and every non-ASCII character in an error message is written as a
+    # replacement character. Preflight's own messages use an em dash, so the first real
+    # failure this captured came back mangled in exactly the place being read for a reason.
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+
     kwargs: dict = {
         "cwd": str(root),
         "stdin": subprocess.DEVNULL,
         "stdout": log_handle,
         "stderr": subprocess.STDOUT,
+        "env": env,
     }
     if os.name == "nt":
         # New process group + no window: survives the parent, and Ctrl+C in the dashboard
@@ -129,8 +152,52 @@ def spawn_orchestrator(config_path: str = "agents/config.yaml") -> int:
                 f"{_log_tail(log_path)}"
             )
 
+    global _last_spawn, _last_spawn_log
+    _last_spawn, _last_spawn_log = proc, log_path
+
     logger.info("Spawned orchestrator pid %s from %s (log: %s)", proc.pid, root, log_path)
     return proc.pid
+
+
+def last_start_failure() -> str | None:
+    """Why the most recent spawn died, or None while it is alive or was never made.
+
+    Startup can fail well after the three seconds spawn_orchestrator waits: preflight
+    probes each CLI with its own timeout, so a missing tool surfaces around 5-20 seconds
+    in. That is the case this covers - the process was created, so the start looked
+    successful, and then it exited with the reason in a log nobody was reading.
+    """
+    proc, log_path = _last_spawn, _last_spawn_log
+    if proc is None:
+        return None
+    code = proc.poll()
+    if code is None:
+        return None  # still alive: a slow start, not a failed one
+    tail = _log_tail(log_path) if log_path else "(no output captured)"
+    # THE REASON GOES ON THE FIRST LINE. The UI shows one line in the status banner, and
+    # a headline of "exited (code 1). Last output:" above a stack trace tells the reader
+    # nothing they did not already know. A traceback's last line is its exception message
+    # - here "gh CLI not found on PATH" - which is the line worth having.
+    return f"orchestrator exited during startup (code {code}): {_reason(tail)}\n{tail}"
+
+
+def _reason(tail: str) -> str:
+    """The most informative single line of a failure: a traceback's last message line."""
+    lines = [ln.strip() for ln in tail.splitlines() if ln.strip()]
+    if not lines:
+        return "no output captured"
+    # Walk back past bare list bullets and frame lines to the sentence that explains it.
+    for line in reversed(lines):
+        cleaned = line.lstrip("-").strip()
+        if cleaned and not cleaned.startswith(('File "', "^", "~")):
+            return cleaned
+    return lines[-1]
+
+
+def clear_start_failure() -> None:
+    """Forget the last spawn, so an old failure cannot describe a new attempt."""
+    global _last_spawn, _last_spawn_log
+    _last_spawn, _last_spawn_log = None, None
 
 
 def _log_tail(path: Path, lines: int = 12) -> str:

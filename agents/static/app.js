@@ -326,12 +326,22 @@ async function refreshOverview() {
     if(sb){
       let statusClass='ok',statusText='System is working normally.';
       const noHeartbeat=!snap.orchestrator_heartbeat||(Date.now()/1000-snap.orchestrator_heartbeat)>30;
+      // The server knows why a start died even if this tab never clicked the button, so a
+      // reload on a phone still gets the reason rather than a bare "disconnected".
+      if(snap.orchestrator_start_error)window.orchStartError=snap.orchestrator_start_error;
+      else if(!noHeartbeat)window.orchStartError='';
       // A start takes several seconds - preflight, stale-worktree cleanup, every agent
       // connecting - and the 5s refresh kept repainting "disconnected" throughout, which
       // contradicted the button's own "waiting for heartbeat" a few pixels above it. Two
       // truths on one screen read as a failure. While a start is in flight the state is
       // CONNECTING: neither a lie nor an alarm.
       if(noHeartbeat&&window.orchStarting){statusClass='connecting';statusText='Orchestrator is starting...';}
+      // A start that DIED is not a disconnection, and saying "disconnected" hides the one
+      // fact that fixes it. First line only: the full output stays under the button.
+      else if(noHeartbeat&&window.orchStartError){
+        statusClass='bad';
+        statusText='Orchestrator failed to start: '+String(window.orchStartError).split('\n')[0];
+      }
       else if(noHeartbeat){statusClass='bad';statusText='Orchestrator is disconnected.';}
       else if(totalExc){statusClass='warn';statusText=totalExc+' item'+(totalExc>1?'s':'')+' need'+(totalExc===1?'s':'')+' attention.';}
       const parts=[statusText];
@@ -1105,7 +1115,18 @@ async function startOrchestrator(){
       await new Promise(r=>setTimeout(r,1500));
       try{
         const s=await (await fetch('/api/orchestrator')).json();
-        if(s.running){window.orchStarting=false;say('');if(typeof refreshOverview==='function')refreshOverview();return;}
+        if(s.running){window.orchStarting=false;window.orchStartError='';say('');if(typeof refreshOverview==='function')refreshOverview();return;}
+        // The process DIED. Say so now, with the reason, instead of showing "starting"
+        // for the rest of the 60s and then a timeout that explains nothing. Startup can
+        // fail well past the spawn check: a missing CLI surfaces 5-20s into preflight.
+        if(s.failed){
+          window.orchStarting=false;
+          window.orchStartError=s.error||'orchestrator exited during startup';
+          say(window.orchStartError);
+          if(btn){btn.disabled=false;btn.textContent='Start orchestrator';}
+          if(typeof refreshOverview==='function')refreshOverview();
+          return;
+        }
       }catch(e){}
     }
     window.orchStarting=false;
