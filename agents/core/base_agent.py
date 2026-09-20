@@ -26,6 +26,7 @@ from agents.core.thread_guard import ThreadGuard
 from agents.core.message_bus import MessageBus
 from agents.core.metrics import Metrics
 from agents.core.mode import MANUAL, get_mode
+from agents.core import refusals
 from agents.core.safety import SafetyChecker, SafetyViolation, build_gate_context
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,7 @@ class AgentProcess(ABC):
         self._metrics: Metrics | None = None
         self._publish_hashes: OrderedDict[str, int] = OrderedDict()  # hash -> count, LRU dedup
         self._thread_guard: ThreadGuard | None = None
+        self._last_gate_outcome = "denied"  # "denied" or "expired"; set when a gate resolves
 
         # Resolve channels
         defaults = self.default_channels()
@@ -722,8 +724,18 @@ class AgentProcess(ABC):
                 thread_id=envelope.thread_id,
             )
             if not approved:
+                # KEEP THE WORK. A refusal used to drop the architect's task entirely,
+                # so the only way back was to run the whole thread again and hope it
+                # arrived somewhere similar — which makes saying no expensive, the
+                # opposite of what an early gate is for.
+                await refusals.record(
+                    self.bus.redis, envelope, "assign_task",
+                    (payload.get("approach", "") or "task assignment").splitlines()[0],
+                    self._last_gate_outcome,
+                )
                 logger.info(
-                    "Agent %s: task assignment on thread %s not approved — no work dispatched",
+                    "Agent %s: task assignment on thread %s not approved — no work "
+                    "dispatched, kept for review",
                     self.agent_id, envelope.thread_id[:8],
                 )
                 return False
@@ -835,6 +847,7 @@ class AgentProcess(ABC):
         )
 
         if response is None:
+            self._last_gate_outcome = "expired"
             logger.warning("Gate %s timed out after %ds", gate.id[:8], self.gate_timeout)
             if self._metrics:
                 await self._metrics.increment("gates:timeout")
@@ -861,6 +874,7 @@ class AgentProcess(ABC):
                 await self._metrics.increment("gates:approved")
             return True
 
+        self._last_gate_outcome = "denied"
         logger.info("Human denied gate %s (action=%s)", gate.id[:8], decision)
         if self._metrics:
             await self._metrics.increment("gates:denied")

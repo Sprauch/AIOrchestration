@@ -114,10 +114,13 @@ function formatReviewRequest(p) {
 }
 
 // ── Navigation ──
-const viewTitles = {overview:'Overview',work:'Work',exceptions:'Exceptions',system:'System'};
+const viewTitles = {overview:'Overview',work:'Workflow',exceptions:'Actions',system:'Diagnostics'};
 document.querySelectorAll('.nav-item').forEach(n=>n.addEventListener('click',()=>switchView(n.dataset.view)));
 function switchView(name) {
-  if(name==='work'&&typeof renderDecisionGates==='function')renderDecisionGates();
+  if(name==='work'&&typeof renderRefused==='function')renderRefused();
+  // Decision Gates lives on Actions now: the rules belong beside the decisions
+  // they produce, not a tab away from them.
+  if(name==='exceptions'&&typeof renderDecisionGates==='function')renderDecisionGates();
   // Auto-close thread detail overlay when switching views
   const overlay=document.getElementById('thread-overlay');
   if(overlay&&overlay.style.display!=='none')closeThreadDetail();
@@ -1094,7 +1097,7 @@ async function refreshExceptions(){
     // Empty state
 
     if(!exc.approvals.length&&!exc.failed_prs.length&&!exc.blocked_threads.length&&!exc.stale_agents.length)
-      ea.innerHTML='<div class="empty" style="padding:40px">No exceptions right now. When approvals are pending, PRs fail, or threads get blocked, they appear here.</div>';
+      ea.innerHTML='<div class="empty" style="padding:40px">Nothing needs you right now. Approvals, failed PRs and blocked threads appear here when they do.</div>';
 
   }catch(e){console.error(e);}
 }
@@ -1103,6 +1106,71 @@ async function gateAction(id,action){const h={method:'POST'};const hdrs=authHead
 // ── Orchestrator control ──
 // Follows the same token pattern as gateAction: stored in localStorage, prompted for on
 // 401, retried once. That means pairing a phone once works for approvals AND for this.
+// ── Refused work ──
+// A refusal is not a deletion. Two ways back, and which one applies is a judgement about
+// whether the PROJECT moved — only a person can make it, so both are offered and neither
+// is guessed at.
+async function renderRefused(){
+  const el=document.getElementById('refused-work');
+  if(!el)return;
+  let items=[];
+  try{ items=(await (await fetch('/api/refused')).json()).refused||[]; }
+  catch(e){ return; }
+  if(!items.length){el.innerHTML='';return;}
+
+  el.innerHTML='<div class="rf-card"><div class="rf-head">'
+    +'<span class="rf-title">Refused — can be revisited</span>'
+    +'<span class="rf-count">'+items.length+'</span></div>'
+    +items.map(it=>{
+      const when=it.refused_at?ago(it.refused_at):'';
+      const why=it.outcome==='expired'
+        ? 'Expired unanswered — refused rather than allowed'
+        : 'You refused this';
+      return '<div class="rf-item">'
+        +'<div class="rf-reason">'+esc(it.reason||it.action||'work')+'</div>'
+        +'<div class="rf-meta">'+esc(why)+(when?' · '+esc(when):'')
+        +' · thread '+esc((it.thread_id||'').slice(0,8))+'</div>'
+        +'<div class="rf-actions">'
+        +'<button class="rf-btn rf-reinstate" onclick="reinstateRefused(\''+esc(it.id)+'\')"'
+        +' title="Approve this same work, unchanged. For a refusal made in error, or one whose reason has gone away while the project has not moved.">Approve after all</button>'
+        +'<button class="rf-btn rf-restart" onclick="restartRefused(\''+esc(it.id)+'\')"'
+        +' title="Run it again from the proposal behind it, on a new thread. For when the project HAS moved, so the reasoning needs redoing rather than reusing.">Start over from the proposal</button>'
+        +'<span class="rf-msg" id="rf-msg-'+esc(it.id)+'"></span>'
+        +'</div></div>';
+    }).join('')+'</div>';
+}
+
+async function _refusedAction(id, verb, label){
+  const msg=document.getElementById('rf-msg-'+id);
+  if(msg)msg.textContent='...';
+  try{
+    const hdrs=authHeaders();
+    const r=await fetch('/api/refused/'+id+'/'+verb,{method:'POST',headers:hdrs||{}});
+    if(r.status===401){
+      const t=prompt('Dashboard token required. Run  .\\AIO.ps1 pair  and paste the token:');
+      if(t&&isValidToken(t.trim())){localStorage.setItem('gate_token',t.trim());return _refusedAction(id,verb,label);}
+      if(msg)msg.textContent='cancelled';
+      return;
+    }
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){if(msg)msg.textContent=d.error||('failed (HTTP '+r.status+')');return;}
+    if(msg)msg.textContent=label+' (thread '+(d.thread_id||'').slice(0,8)+')';
+    renderRefused();
+    if(typeof refreshOverview==='function')refreshOverview();
+  }catch(e){ if(msg)msg.textContent='failed: '+e.message; }
+}
+function reinstateRefused(id){return _refusedAction(id,'reinstate','approved');}
+function restartRefused(id){return _refusedAction(id,'restart','restarted');}
+
+// Hours are how the config stores it; days are how the decision is actually thought
+// about. "168 h" makes a reader do arithmetic to find out it means a week.
+function fmtDuration(hours){
+  if(!hours)return '';
+  if(hours>=48){const d=Math.round(hours/24);return d===7?'a week':d+' days';}
+  if(hours>=24)return '24 hours';
+  return hours+' hours';
+}
+
 // ── Decision gates ──
 // The rules already governed every run; they just were not stated anywhere a person
 // looks. Not knowing them produced exactly the alarm they exist to prevent — work
@@ -1131,7 +1199,7 @@ async function renderDecisionGates(){
   if(p.branch_prefix)limits.push('Agents may only commit to branches starting <code>'+esc(p.branch_prefix)+'</code>.');
   if((p.never_push_to||[]).length)limits.push('Never pushed to: '+p.never_push_to.map(b=>'<code>'+esc(b)+'</code>').join(', ')+'.');
   if(p.max_files_per_change)limits.push('A change touching more than '+p.max_files_per_change+' files escalates.');
-  if(p.gate_timeout_hours)limits.push('An unanswered gate expires after '+p.gate_timeout_hours+' h, and is then refused rather than allowed.');
+  if(p.gate_timeout_hours)limits.push('An unanswered gate expires after '+fmtDuration(p.gate_timeout_hours)+', and is then refused rather than allowed — but a refusal can be revisited.');
 
   el.innerHTML='<details class="dg-card" open><summary class="dg-head">'
     +'<span class="dg-title">Decision Gates</span>'
@@ -1380,7 +1448,7 @@ async function renderAudit(){
     if(critical)summary.push(critical+' critical');
     if(warnings)summary.push(warnings+' warning'+(warnings>1?'s':''));
     const verdict = findings.length===1 ? '1 issue needs attention' : findings.length+' issues need attention';
-    el.innerHTML='<div class="sh-verdict sh-'+severity+'"><div class="sh-icon">'+icon+'</div><div class="sh-body"><div class="sh-title">'+verdict+'</div><div class="sh-sub">Checked pipeline health, blocked threads, failed PRs, and agent state.</div><a href="#" class="sh-link" onclick="switchView(\'system\');return false">View details in System &rarr;</a></div></div>';
+    el.innerHTML='<div class="sh-verdict sh-'+severity+'"><div class="sh-icon">'+icon+'</div><div class="sh-body"><div class="sh-title">'+verdict+'</div><div class="sh-sub">Checked pipeline health, blocked threads, failed PRs, and agent state.</div><a href="#" class="sh-link" onclick="switchView(\'system\');return false">View details in Diagnostics &rarr;</a></div></div>';
   }
   renderAuditFull(findings);
 }

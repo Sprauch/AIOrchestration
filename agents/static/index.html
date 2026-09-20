@@ -19,15 +19,15 @@
       <span class="nav-label">Overview</span>
     </div>
     <div class="nav-item" data-view="work">
-      <span class="nav-label">Work</span>
+      <span class="nav-label">Workflow</span>
       <span class="nav-badge" id="nav-work-count" style="display:none">0</span>
     </div>
     <div class="nav-item" data-view="exceptions">
-      <span class="nav-label">Exceptions</span>
+      <span class="nav-label">Actions</span>
       <span class="nav-badge" id="nav-exc-count" style="display:none">0</span>
     </div>
     <div class="nav-item" data-view="system">
-      <span class="nav-label">System</span>
+      <span class="nav-label">Diagnostics</span>
     </div>
   </div>
   <!-- Built from the server's phase list, never hardcoded. It used to be four fixed steps
@@ -99,9 +99,6 @@
     <!-- WORK -->
     <div class="view" id="view-work">
       <p class="view-desc">Each thread is one improvement flowing through the pipeline. A thread may go through multiple proposal rounds before shipping.</p>
-      <!-- What stops for you and what does not. Stated here because these rules governed
-           every run already but existed only as lines in a config file. -->
-      <div id="decision-gates"></div>
       <div class="work-header">
         <div class="work-filters" id="work-filters">
           <button class="filter-btn active" data-filter="all">All</button>
@@ -113,6 +110,9 @@
         <span class="ch-count" id="thread-count">0</span>
       </div>
       <div id="work-list" class="work-list"><div class="empty loading-pulse">Connecting to orchestrator...</div></div>
+      <!-- Refused work belongs WITH the work, not with the reference material below:
+           it is a thing waiting on a decision, not an explanation of the rules. -->
+      <div id="refused-work"></div>
       <!-- Thread detail overlay -->
       <div class="overlay" id="thread-overlay" style="display:none">
         <div class="overlay-backdrop" onclick="closeThreadDetail()"></div>
@@ -136,11 +136,14 @@
 
     <!-- EXCEPTIONS -->
     <div class="view" id="view-exceptions">
-      <p class="view-desc">Items that need your attention or action right now.</p>
+      <p class="view-desc">Decisions waiting on you, and the rules that produce them.</p>
       <div class="exc-section" id="exc-approvals"></div>
       <div class="exc-section" id="exc-failed-prs"></div>
       <div class="exc-section" id="exc-blocked"></div>
       <div class="exc-section" id="exc-stale"></div>
+      <!-- The rules behind the decisions above. Last, because a gate waiting on you
+           is more urgent than the policy that produced it. -->
+      <div id="decision-gates"></div>
     </div>
 
     <!-- SYSTEM -->

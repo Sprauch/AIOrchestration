@@ -1460,3 +1460,30 @@ tr.click { cursor: pointer; }
   background: var(--bg); padding: 1px 5px; border-radius: 3px;
 }
 .dg-blocked { display: flex; flex-wrap: wrap; gap: 5px; }
+
+/* ── Refused work ───────────────────────────────────────────────────────── */
+.rf-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-left: 3px solid var(--orange); border-radius: 8px;
+  margin: 16px 0; padding: 14px 16px;
+}
+.rf-head { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.rf-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.rf-count {
+  font-family: var(--mono); font-size: 11px; color: var(--orange);
+  background: var(--orange-bg); padding: 1px 7px; border-radius: 10px;
+}
+.rf-item { padding: 10px 0; border-top: 1px solid var(--border); }
+.rf-item:first-of-type { border-top: none; padding-top: 0; }
+.rf-reason { font-size: 13px; font-weight: 600; line-height: 1.4; }
+.rf-meta { font-size: 11px; color: var(--subtle); margin-top: 3px; }
+.rf-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+.rf-btn {
+  font-family: inherit; font-size: 12px; font-weight: 600;
+  padding: 6px 12px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--bg); color: var(--text);
+}
+.rf-btn:hover { border-color: var(--dim); }
+.rf-reinstate { border-color: var(--green); color: var(--green-text); }
+.rf-restart { border-color: var(--blue); color: var(--blue); }
+.rf-msg { font-size: 11px; color: var(--dim); }

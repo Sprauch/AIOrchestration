@@ -23,6 +23,7 @@ from agents.core.auditor import audit_pipeline
 from agents.core.message import Envelope, MessageType
 from agents.core.message_bus import MessageBus
 from agents.core.mode import MODES, get_mode, set_mode
+from agents.core import refusals
 from agents.core.redis_keys import _active_keys, _clear_active_work_thread
 from agents.core.state import derive_current_phase, load_snapshot
 from agents.core.supervisor import (
@@ -83,6 +84,9 @@ class WebDashboard:
         app.router.add_get("/api/agents/{agent_id}", self._handle_agent_detail)
         app.router.add_get("/api/streams/{stream_name}", self._handle_stream_messages)
         app.router.add_get("/api/policy", self._handle_policy)
+        app.router.add_get("/api/refused", self._handle_refused_list)
+        app.router.add_post("/api/refused/{refusal_id}/reinstate", self._handle_refused_reinstate)
+        app.router.add_post("/api/refused/{refusal_id}/restart", self._handle_refused_restart)
         app.router.add_get("/api/mode", self._handle_mode_get)
         app.router.add_post("/api/mode", self._handle_mode_set)
         app.router.add_post("/api/proposals", self._handle_submit_proposal)
@@ -1248,6 +1252,115 @@ class WebDashboard:
         return headers
 
 
+
+
+    # ── Refused work, and the two ways back ────────────────
+
+    async def _handle_refused_list(self, request: web.Request) -> web.Response:
+        """Work that was refused at a gate and can still be revisited."""
+        items = await refusals.list_all(self.bus.redis)
+        return web.json_response({"refused": items})
+
+    async def _handle_refused_reinstate(self, request: web.Request) -> web.Response:
+        """Approve refused work after all, unchanged.
+
+        For a refusal made in error, or one whose reason has gone away while the project
+        has not moved: the task was right, the moment was wrong. The message is published
+        exactly as the agent wrote it, straight to the channel it was bound for — no gate
+        this time, because this IS the approval.
+        """
+        if err := self._check_gate_auth(request):
+            return err
+
+        refusal_id = request.match_info["refusal_id"]
+        entry = await refusals.get(self.bus.redis, refusal_id)
+        if not entry:
+            return web.json_response({"error": "no such refusal"}, status=404)
+
+        channel = refusals.CHANNEL_FOR_TYPE.get(entry.get("message_type", ""))
+        if not channel:
+            return web.json_response(
+                {"error": f"cannot reinstate a {entry.get('message_type')} message"},
+                status=400,
+            )
+
+        env = Envelope(
+            sender_id="person",
+            sender_role="person",
+            message_type=MessageType(entry["message_type"]),
+            payload=entry.get("payload", {}),
+            thread_id=entry.get("thread_id") or "",
+        )
+        await self.bus.publish(channel, env)
+        await refusals.resolve(self.bus.redis, refusal_id)
+        logger.info(
+            "Reinstated refusal %s onto %s (thread %s)",
+            refusal_id, channel, env.thread_id[:8],
+        )
+        return web.json_response({"reinstated": True, "thread_id": env.thread_id})
+
+    async def _handle_refused_restart(self, request: web.Request) -> web.Response:
+        """Run it again from the proposal that produced it, on a fresh thread.
+
+        For when the PROJECT has moved. The refused task was reasoned out against a
+        codebase that no longer exists, so reusing its conclusion would be reusing a stale
+        premise — the question has to be asked again rather than answered from a cached
+        result. The original proposal is republished unchanged; everything after it is
+        derived fresh.
+        """
+        if err := self._check_gate_auth(request):
+            return err
+
+        refusal_id = request.match_info["refusal_id"]
+        entry = await refusals.get(self.bus.redis, refusal_id)
+        if not entry:
+            return web.json_response({"error": "no such refusal"}, status=404)
+
+        thread_id = entry.get("thread_id") or ""
+        proposal = await self._find_proposal_for_thread(thread_id)
+        if proposal is None:
+            return web.json_response(
+                {"error": "the proposal behind this work is no longer in the stream; "
+                          "submit it again by hand"},
+                status=404,
+            )
+
+        # A NEW thread: this is a fresh attempt, not a continuation of the refused one.
+        env = Envelope(
+            sender_id="person",
+            sender_role="person",
+            message_type=MessageType.PROPOSAL,
+            payload=proposal,
+            recipient_role=(
+                "product_designer"
+                if str(proposal.get("target_area", "")).lower() in self.USER_FACING_TARGETS
+                else "architect"
+            ),
+        )
+        await self.bus.publish("proposals", env)
+        await refusals.resolve(self.bus.redis, refusal_id)
+        logger.info(
+            "Restarted refusal %s from its proposal (new thread %s)",
+            refusal_id, env.thread_id[:8],
+        )
+        return web.json_response({"restarted": True, "thread_id": env.thread_id})
+
+    async def _find_proposal_for_thread(self, thread_id: str) -> dict | None:
+        """The proposal payload that started a thread, or None if it has aged out."""
+        if not thread_id:
+            return None
+        try:
+            entries = await self.bus.redis.xrange("stream:proposals")
+        except Exception:
+            return None
+        for _mid, fields in entries or []:
+            try:
+                env = json.loads(fields.get("data") or "{}")
+            except (json.JSONDecodeError, AttributeError):
+                continue
+            if env.get("thread_id") == thread_id:
+                return env.get("payload") or None
+        return None
 
     # ── Decision gates ─────────────────────────────────────
 
