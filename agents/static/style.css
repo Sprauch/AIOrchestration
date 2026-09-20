@@ -186,7 +186,10 @@ body {
   50% { box-shadow: 0 0 0 5px rgba(212,168,83,0.05); }
 }
 @media (max-width: 1100px) { .phase-label { display: none; } .phase-indicator { gap: 0; } .phase-step { padding: 4px 6px; } }
-@media (max-width: 700px) { .phase-indicator { display: none; } }
+/* 900, not 700: at 768px the indicator still rendered and pushed the nav 74px past
+   the viewport - measured, not guessed. The tabs matter more than the phase strip, and
+   the same information is on the Overview page. */
+@media (max-width: 900px) { .phase-indicator { display: none; } }
 
 /* ═══ LAYOUT ═══ */
 .main { display: flex; flex-direction: column; height: calc(100vh - 56px); overflow: hidden; }
@@ -1244,4 +1247,64 @@ tr.click { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) {
   .brief-connecting .brief-dot { animation: none; }
+}
+
+/* ── Header at phone width ──────────────────────────────────────────────────
+   Reported from a phone: the nav was cut off, with "Exceptions" clipped and
+   "System" off-screen entirely.
+
+   The cause was structural rather than a missing breakpoint. .topnav is a flex row
+   whose logo is flex-shrink:0 and whose tab strip neither wraps nor scrolls, so once
+   the content exceeded the viewport the overflow was simply unreachable - the tabs
+   were not small, they were gone.
+
+   Three changes, in the order they matter:
+     1. the tab strip can scroll, so no tab is ever unreachable whatever the width;
+     2. the brand shortens to AIO, which buys ~110px - more than any amount of
+        padding-trimming, and the full name is already in the page title;
+     3. padding and gaps tighten so all four tabs fit without scrolling on a
+        typical phone, making (1) a safety net rather than the normal experience. */
+.brand-short { display: none; }
+
+@media (max-width: 720px) {
+  .topnav {
+    padding: 0 12px;
+    gap: 8px;
+  }
+  .brand-full { display: none; }
+  .brand-short { display: inline; }
+
+  .topnav-tabs {
+    margin-left: 4px;
+    gap: 0;
+    overflow-x: auto;
+    /* Keep the row from being squeezed by a long status on the right. */
+    flex: 1 1 auto;
+    min-width: 0;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  .topnav-tabs::-webkit-scrollbar { display: none; }
+
+  .nav-item {
+    padding: 8px 10px;
+    font-size: 12.5px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  .nav-badge { margin-left: 3px; padding: 1px 5px; }
+
+  /* The phase indicator is already hidden below 700px; the right-hand status text
+     is the other thing competing for the row, and the coloured dot carries the same
+     information in a fraction of the width. */
+  .topnav-right #sb-status,
+  .topnav-right #sb-uptime { display: none; }
+  .topnav-right { gap: 6px; }
+}
+
+/* Very narrow, or a large accessibility text size: drop the brand entirely rather
+   than let it push a tab off the edge. The tabs are what the header is for. */
+@media (max-width: 400px) {
+  .topnav-logo { display: none; }
+  .nav-item { padding: 8px 9px; }
 }

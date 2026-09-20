@@ -43,7 +43,7 @@ Your response MUST be exactly one JSON object:
       "message_type": "proposal",
       "recipient_role": "architect",
       "payload": {
-        "title": "Short descriptive title",
+        "title": "A headline, not a sentence. MAX 80 CHARACTERS. It is read on a phone, in a list, and is never truncated anywhere - so an over-long one makes the list unreadable rather than being quietly shortened. Put the detail in user_problem and description, which have room for it.",
         "target_area": "product|ux|trust|reliability|technical|cost|onboarding|workflow",
         "user_problem": "What the user is struggling with or what value is missing",
         "proposed_change": "What should change in the product experience or behavior",

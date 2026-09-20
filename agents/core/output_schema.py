@@ -45,6 +45,9 @@ PROPOSAL_PAYLOAD = {
     "type": "object",
     "additionalProperties": False,
     "properties": {
+        # 100 not 80: the prompt asks for 80 so there is headroom before the schema
+        # rejects an otherwise good proposal. The API does not truncate, so the only
+        # enforcement is here and in the prompt.
         "title": _str(100),
         "target_area": {"type": "string", "enum": ["product", "ux", "trust", "reliability", "technical", "cost", "onboarding", "workflow"]},
         "user_problem": _str(400),

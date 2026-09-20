@@ -565,7 +565,7 @@ class WebDashboard:
 
             if mt == MessageType.PROPOSAL:
                 t["proposal_submissions"] += 1
-                t["label"] = p.get("title", "")[:60]
+                t["label"] = p.get("title", "")
                 t["stage"] = "proposed"
             elif mt == MessageType.PROPOSAL_REVIEW:
                 d = p.get("decision", "")
@@ -962,7 +962,7 @@ class WebDashboard:
             et = event["type"]
             p = event["payload"]
             if et == "proposal":
-                group["title"] = p.get("title", "")[:80] or f"Proposal {group['proposal_index']}"
+                group["title"] = p.get("title", "") or f"Proposal {group['proposal_index']}"
                 group["stage"] = "proposed"
                 group["status"] = "active"
             elif et == "proposal_review":
@@ -1010,7 +1010,7 @@ class WebDashboard:
                     current["is_current"] = False
                 current = {
                     "proposal_index": len(groups) + 1,
-                    "title": event["payload"].get("title", "")[:80] or f"Proposal {len(groups) + 1}",
+                    "title": event["payload"].get("title", "") or f"Proposal {len(groups) + 1}",
                     "timestamp": event["timestamp"],
                     "stage": "proposed",
                     "status": "active",
