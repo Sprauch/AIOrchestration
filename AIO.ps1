@@ -124,27 +124,40 @@ switch ($Command.ToLower()) {
         }
         Write-Host ""
         Write-Host "Merging a pull request is the judgement gate. Stop with: .\AIO.ps1 stop"
-        Start-Process "http://localhost:8081"
+        Write-Host "Pair a phone with: .\AIO.ps1 pair"
+        # Opens with the token so THIS browser is paired without anyone typing it; the
+        # page stores it and strips it from the address bar on load.
+        Start-Process "http://localhost:8081/?token=$token"
     }
-    "token" {
+    { $_ -in @("token", "pair") } {
         $token = Get-DashboardToken
-        $ts = "C:\Program Files\Tailscale\tailscale.exe"
-        # `tailscale ip` writes to stderr and exits non-zero when logged out, which
-        # PowerShell renders as a wall of NativeCommandError. Swallow it and report the
-        # state in one line instead.
         $ip = Get-TailscaleIp
+        # The pairing URL carries the token once. Opening it stores the token on that
+        # device and strips it from the address bar, so it is never typed and does not
+        # linger in history. Pair each device once; after that the plain URL works.
+        $phonePair = if ($ip) { "http://${ip}:8081/?token=$token" } else { $null }
+
         Write-Host ""
-        Write-Host "dashboard token  $token"
-        Write-Host "stored at        $TokenFile"
-        if ($ip) {
-            Write-Host "phone URL        http://${ip}:8081"
+        Write-Host "PAIR THIS PHONE - open the link below on it, once:" -ForegroundColor Cyan
+        if ($phonePair) {
+            Write-Host "  $phonePair"
+            try {
+                Set-Clipboard -Value $phonePair
+                Write-Host "  (copied to clipboard - message it to yourself)" -ForegroundColor DarkGray
+            } catch { }
         } else {
-            Write-Host "phone URL        (Tailscale not connected - run: tailscale up)"
+            Write-Host "  Tailscale is not connected. Run: tailscale up" -ForegroundColor Yellow
         }
         Write-Host ""
-        Write-Host "The token authorises APPROVE and DENY only. The view is not"
-        Write-Host "authenticated at all, which is why this is reached over Tailscale"
-        Write-Host "rather than an open port."
+        Write-Host "After pairing, the phone uses the plain address:"
+        if ($ip) { Write-Host "  http://${ip}:8081" } else { Write-Host "  (needs Tailscale)" }
+        Write-Host ""
+        Write-Host "token      $token"
+        Write-Host "stored at  $TokenFile"
+        Write-Host ""
+        Write-Host "The token authorises APPROVE, DENY and STARTING the orchestrator." -ForegroundColor Yellow
+        Write-Host "The VIEW is not authenticated at all, which is why this is reached"
+        Write-Host "over Tailscale rather than an open port."
     }
     "stop" {
         # Only the windows AIO opened: matched on the title set in Start-Piece, so an

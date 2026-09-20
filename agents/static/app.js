@@ -9,21 +9,21 @@ function ago(ts) { if (!ts) return '-'; const s = Math.floor(Date.now()/1000-ts)
 const _stageHelp={
   'Analyzing':'PM is analyzing the codebase for improvement opportunities',
   'Proposed':'PM submitted a proposal, waiting for technical review',
-  'Developer Assigned':'Tech Lead approved and assigned this to a developer',
+  'Developer Assigned':'Architect approved and assigned this to a developer',
   'Implementing':'Developer is working on the code changes',
   'Awaiting Review':'Developer finished, waiting for reviewer',
   'In Review':'Reviewer is checking the developer\'s work',
   'Rework':'Reviewer requested changes — developer will address them',
   'Completed':'Code review passed — ready for PR creation',
-  'Rejected':'Tech Lead rejected this proposal',
-  'Sent Back to PM':'Tech Lead sent this back for PM to revise',
+  'Rejected':'Architect rejected this proposal',
+  'Sent Back to PM':'Architect sent this back for PM to revise',
   'Blocked':'Thread is stuck and needs operator intervention',
   'Abandoned':'Operator marked this thread as skipped',
 };
 function badge(t) { const tip=_stageHelp[t];return '<span class="badge '+t.toLowerCase().replace(/\s+/g,'_')+'"'+(tip?' title="'+esc(tip)+'"':'')+'>'+esc(t)+'</span>'; }
 function role(id) { return id.replace(/-\d+$/,'').replace(/-challenger$/,''); }
-function initials(r) { return {pm:'PM',product_designer:'PD',tech_lead:'TL',developer:'DV',reviewer:'RV',orchestrator:'OR'}[r]||'??'; }
-function roleTitle(r) { return {pm:'Product Manager',product_designer:'Product Designer',tech_lead:'Tech Lead',developer:'Developer',reviewer:'Reviewer'}[r]||r; }
+function initials(r) { return {pm:'PM',product_designer:'PD',architect:'AR',developer:'DV',reviewer:'RV',orchestrator:'OR'}[r]||'??'; }
+function roleTitle(r) { return {pm:'Product Manager',product_designer:'Product Designer',architect:'Architect',developer:'Developer',reviewer:'Reviewer'}[r]||r; }
 function stageLabel(s) { return {analyzing:'Analyzing',proposed:'Proposed',approved:'Developer Assigned',implementing:'Implementing',awaiting_review:'Awaiting Review',in_review:'In Review',rework:'Rework',completed:'Completed',rejected:'Rejected',revision_requested:'Sent Back to PM',cycle_exhausted:'Blocked',blocked:'Blocked',abandoned:'Abandoned'}[s]||s; }
 function decisionLabel(d) { return {needs_revision:'Sent back to PM',needs_clarification:'Sent back to PM',approved:'Approved',rejected:'Rejected',changes_requested:'Changes requested'}[d]||d; }
 function relTime(ts) {
@@ -269,7 +269,7 @@ function renderErrorSummary(exceptions, metrics, threads) {
   }).join('');
 }
 function _stageToRole(stage) {
-  var map = {analyzing:'pm',proposed:'pm',approved:'tech_lead',implementing:'developer',awaiting_review:'developer',in_review:'reviewer',rework:'developer',completed:'system',rejected:'tech_lead',revision_requested:'tech_lead',cycle_exhausted:'system',blocked:'system',abandoned:'system'};
+  var map = {analyzing:'pm',proposed:'pm',approved:'architect',implementing:'developer',awaiting_review:'developer',in_review:'reviewer',rework:'developer',completed:'system',rejected:'architect',revision_requested:'architect',cycle_exhausted:'system',blocked:'system',abandoned:'system'};
   return map[stage] || 'system';
 }
 
@@ -383,7 +383,7 @@ async function refreshOverview() {
       const allAgents=snap.agents||[];
       const anyActive=allAgents.some(a=>!a.paused);
       const pauseAllBtn='<button class="as-pause-all" onclick="togglePauseAll()" title="'+(anyActive?'Pause all agents':'Resume all agents')+'">'+(anyActive?'Pause All':'Resume All')+'</button>';
-      as.innerHTML=['pm','product_designer','tech_lead','developer','reviewer'].map(r=>{
+      as.innerHTML=['pm','product_designer','architect','developer','reviewer'].map(r=>{
         const agents=byR[r]||[];
         if(!agents.length)return '<div class="as-agent as-'+r+'"><div class="as-dot off"></div><div class="as-label">'+roleTitle(r)+'</div><div class="as-status">—</div></div>';
         return agents.map(a=>{
@@ -911,7 +911,7 @@ async function refreshRedisInspector() {
     const aw = document.getElementById('redis-active-work');
     if (aw) {
       const sets = data.active_work || {};
-      const labels = {'orchestrator:active:designs':'Design','orchestrator:active:proposals':'Tech Lead','orchestrator:active:tasks':'Tasks','orchestrator:active:reviews':'Reviews'};
+      const labels = {'orchestrator:active:designs':'Design','orchestrator:active:proposals':'Architect','orchestrator:active:tasks':'Tasks','orchestrator:active:reviews':'Reviews'};
       let awH = '';
       for (const [key, label] of Object.entries(labels)) {
         const members = sets[key] || [];
@@ -939,9 +939,9 @@ async function refreshRedisInspector() {
 }
 
 // ── Pipeline ──
-const PIPELINE_ROLES=['pm','product_designer','tech_lead','developer','reviewer'],PIPELINE_CONNECTIONS=[['pm','product_designer'],['pm','tech_lead'],['product_designer','tech_lead'],['tech_lead','developer'],['developer','reviewer'],['reviewer','developer']],DELIBERATION_ROLES=['pm','tech_lead'];
-const PIPELINE_QUEUE_MAP={pm_product_designer:'designs',product_designer_tech_lead:'proposals',tech_lead_developer:'tasks',developer_reviewer:'reviews'};
-const PIPELINE_STAGE_QUEUE={product_designer:'designs',tech_lead:'proposals',developer:'tasks',reviewer:'reviews'};
+const PIPELINE_ROLES=['pm','product_designer','architect','developer','reviewer'],PIPELINE_CONNECTIONS=[['pm','product_designer'],['pm','architect'],['product_designer','architect'],['architect','developer'],['developer','reviewer'],['reviewer','developer']],DELIBERATION_ROLES=['pm','architect'];
+const PIPELINE_QUEUE_MAP={pm_product_designer:'designs',product_designer_architect:'proposals',architect_developer:'tasks',developer_reviewer:'reviews'};
+const PIPELINE_STAGE_QUEUE={product_designer:'designs',architect:'proposals',developer:'tasks',reviewer:'reviews'};
 const PIPELINE_QUEUE_LABELS={designs:'design',proposals:'proposal',tasks:'task',reviews:'review'};
 function queueBadgeText(stage,q){
   if(!q||!q.active)return '';
@@ -956,7 +956,7 @@ function _renderPipeline(cId,sId,agents,challengers,opts){
   const byRole={};PIPELINE_ROLES.forEach(r=>byRole[r]=[]);agents.forEach(a=>{const r=role(a.agent_id);if(byRole[r])byRole[r].push(a);});
   const nR=compact?24:34,chOff=showChallengers?(compact?24:34):0,cy=compact?(h/2+8):(h/2+18),sp=Math.min(compact?175:280,(w-180)/(PIPELINE_ROLES.length-1)),sx=w/2-(sp*(PIPELINE_ROLES.length-1))/2;
   // Per-role layout: above = labels above bar then circle; below = circle then labels below bar
-  const _nodeDir={pm:'above',product_designer:'below',tech_lead:'above',developer:'below',reviewer:'above'};
+  const _nodeDir={pm:'above',product_designer:'below',architect:'above',developer:'below',reviewer:'above'};
   const pos={},cpos={};let html='';
   PIPELINE_ROLES.forEach((r,i)=>{const x=sx+i*sp,ra=byRole[r]||[];const stageQueue=PIPELINE_STAGE_QUEUE[r];const q=stageQueue&&bp[stageQueue];const qBadge=q&&q.active?'<div class="node-queue '+(q.gated?'full':q.active/q.limit>=0.5?'warn':'')+'">'+queueBadgeText(stageQueue,q)+'</div>':'';
   const dir=_nodeDir[r]||'above';
@@ -1095,7 +1095,7 @@ async function togglePauseAll(){
 // ── Token usage ──
 function fmtTok(n){if(!n)return '0';if(n>=1e6)return (n/1e6).toFixed(1)+'M';if(n>=1e3)return (n/1e3).toFixed(1)+'k';return String(n);}
 function fmtCost(mc){if(!mc)return '';const d=mc/100000;return d>=1?'$'+d.toFixed(2):d>=0.01?'$'+d.toFixed(3):'$'+d.toFixed(4);}
-const ROLE_COLORS={pm:'var(--blue)',product_designer:'var(--cyan)',tech_lead:'var(--orange)',developer:'var(--green)',reviewer:'var(--purple)'};
+const ROLE_COLORS={pm:'var(--blue)',product_designer:'var(--cyan)',architect:'var(--orange)',developer:'var(--green)',reviewer:'var(--purple)'};
 async function renderAudit(){
   const el=document.getElementById('audit-container');if(!el)return;
   let findings;
@@ -1218,7 +1218,7 @@ function renderTokenUsage(mt){
 
   // Find biggest spender
   let bigRole='',bigVal=0;
-  ['pm','product_designer','tech_lead','developer','reviewer'].forEach(r=>{
+  ['pm','product_designer','architect','developer','reviewer'].forEach(r=>{
     const rv=(parseInt(mt['tokens_in:'+r])||0)+(parseInt(mt['tokens_out:'+r])||0);
     if(rv>bigVal){bigVal=rv;bigRole=r;}
   });
@@ -1231,7 +1231,7 @@ function renderTokenUsage(mt){
 
   // Per-role bars
   h+='<div class="tok-bars">';
-  ['pm','product_designer','tech_lead','developer','reviewer'].forEach(r=>{
+  ['pm','product_designer','architect','developer','reviewer'].forEach(r=>{
     const i=parseInt(mt['tokens_in:'+r])||0,o=parseInt(mt['tokens_out:'+r])||0,c=parseInt(mt['cost_mc:'+r])||0;
     const rt=i+o;if(!rt)return;
     const pct=Math.max(2,Math.round(rt/total*100));
@@ -1280,6 +1280,25 @@ document.addEventListener('keydown',function(e){
   const viewKeys={'1':'overview','2':'work','3':'exceptions','4':'system'};
   if(viewKeys[e.key]&&!e.ctrlKey&&!e.metaKey&&!e.altKey){switchView(viewKeys[e.key]);return;}
 });
+
+// ── Pairing ──
+// A 64-character hex token is not something anyone types, least of all on a phone. If the
+// page is opened with ?token=..., store it for this device and strip it from the URL.
+//
+// Stripping matters: a token left in the address bar reaches browser history, travels
+// when someone copies the URL, and can appear in a Referer header later. replaceState
+// rather than pushState means Back does not restore it either.
+(function pairFromUrl(){
+  try{
+    const u=new URL(window.location.href);
+    const t=u.searchParams.get('token');
+    if(!t)return;
+    localStorage.setItem('gate_token',t);
+    u.searchParams.delete('token');
+    window.history.replaceState({},document.title,u.pathname+(u.search||'')+u.hash);
+    console.info('Dashboard token stored for this device.');
+  }catch(e){}
+})();
 
 // ── Init ──
 refreshOverview();
