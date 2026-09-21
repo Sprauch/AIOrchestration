@@ -1558,3 +1558,20 @@ table.ut tr:last-child td { border-bottom: none; }
   .ut-bar, table.ut th:nth-child(2) { display: none; }
   .ut-dim, table.ut th:nth-child(4), table.ut th:nth-child(5) { display: none; }
 }
+
+/* ── Shortcuts from the Overview ────────────────────────────────────────
+   A tile stating a number the reader may want to act on should take them where
+   acting is possible. The affordance has to be visible, or the link may as well
+   not exist. */
+.otile-link, .error-link { cursor: pointer; }
+.otile-link { transition: border-color 120ms ease, transform 120ms ease; }
+.otile-link:hover { transform: translateY(-1px); }
+.otile-link::after {
+  content: '→';
+  position: absolute; top: 12px; right: 14px;
+  font-size: 13px; color: var(--subtle); opacity: 0;
+  transition: opacity 120ms ease;
+}
+.otile { position: relative; }
+.otile-link:hover::after { opacity: 1; }
+.error-link:hover { background: var(--surface-hover); }

@@ -310,7 +310,9 @@ function renderErrorSummary(exceptions, metrics, threads) {
   }
 
   el.innerHTML = errors.map(function(e) {
-    return '<div class="error-entry severity-' + e.severity + '">' +
+    // Every row leads to Telemetry, where the counters and streams behind it live.
+    return '<div class="error-entry error-link severity-' + e.severity + '"'
+      + ' onclick="goToTelemetry()" title="Open Telemetry">' +
       '<span class="ee-time">' + esc(e.time) + '</span>' +
       '<span class="ee-source ' + e.sourceRole + '">' + esc(e.source) + '</span>' +
       '<span class="ee-desc">' + esc(e.desc) + '</span>' +
@@ -458,8 +460,8 @@ async function refreshOverview() {
     // 3. Outcome tiles
     document.getElementById('outcome-tiles').innerHTML=[
       '<div class="otile c-green"><div class="ot-label">Completed</div><div class="ot-value">'+completed+'</div><div class="ot-sub">'+(mt['prs:created']||0)+' PRs created</div></div>',
-      '<div class="otile c-amber"><div class="ot-label">In Progress</div><div class="ot-value">'+healthy+'</div><div class="ot-sub">'+threads.length+' total threads</div></div>',
-      '<div class="otile '+(blocked?'c-red':'c-green')+'"><div class="ot-label">Blocked</div><div class="ot-value">'+blocked+'</div><div class="ot-sub">'+(blocked?blocked+' need attention':'All clear')+'</div></div>',
+      '<div class="otile c-amber otile-link" onclick="goToActiveWork()" title="Show the active threads"><div class="ot-label">In Progress</div><div class="ot-value">'+healthy+'</div><div class="ot-sub">'+threads.length+' total threads</div></div>',
+      '<div class="otile otile-link '+(blocked?'c-red':'c-green')+'" onclick="goToBlocked()" title="Show what needs a decision"><div class="ot-label">Blocked</div><div class="ot-value">'+blocked+'</div><div class="ot-sub">'+(blocked?blocked+' need attention':'All clear')+'</div></div>',
       // Both figures, because they answer different questions. The dollar amount is the
       // API-rate equivalent and is real but abstract on a subscription; the percentage
       // of the weekly allowance is the one you act on. Percentage leads.
@@ -475,13 +477,13 @@ async function refreshOverview() {
         if(w.budget){
           const pct=w.pct||0;
           const tone=pct>=90?'c-red':pct>=70?'c-amber':'c-blue';
-          return '<div class="otile '+tone+'"><div class="ot-label">Consumption this week</div>'
+          return '<div class="otile otile-link '+tone+'" onclick="goToUsage()" title="Break this down per agent, per proposal, per hour"><div class="ot-label">Consumption this week</div>'
             +'<div class="ot-value">'+pct+'%</div>'
             +'<div class="ot-bar"><div class="ot-bar-fill" style="width:'+Math.min(pct,100)+'%"></div></div>'
             +'<div class="ot-rows">'+rows.join('')+'</div></div>';
         }
         // No allowance configured: show what is known rather than a percentage of nothing.
-        return '<div class="otile c-blue"><div class="ot-label">Usage this week</div>'
+        return '<div class="otile otile-link c-blue" onclick="goToUsage()" title="Break this down per agent, per proposal, per hour"><div class="ot-label">Usage this week</div>'
           +'<div class="ot-value">'+fmtT(w.used||0)+'</div>'
           +'<div class="ot-rows">'+rows.join('')
           +'<div class="ot-row ot-row-hint"><span>Set weekly_token_budget for %</span></div></div></div>';
@@ -1146,6 +1148,27 @@ async function gateAction(id,action){const h={method:'POST'};const hdrs=authHead
 // ── Orchestrator control ──
 // Follows the same token pattern as gateAction: stored in localStorage, prompted for on
 // 401, retried once. That means pairing a phone once works for approvals AND for this.
+// ── Shortcuts from the Overview tiles ──
+// Each tile states a number the reader may want to act on. Landing them on the right tab
+// AND the right sub-selection is the difference between a link and an answer: arriving on
+// Diagnostics with Agents selected, when the number was about spend, is another step to
+// work out.
+function goToView(view, subTab, filter){
+  switchView(view);
+  if(subTab){
+    const t=document.querySelector('[data-sub="'+subTab+'"]');
+    if(t)t.click();
+  }
+  if(filter){
+    const f=document.querySelector('#work-filters [data-filter="'+filter+'"]');
+    if(f)f.click();
+  }
+}
+function goToActiveWork(){ goToView('work', null, 'active'); }
+function goToUsage(){ goToView('system', 'sys-usage'); }
+function goToBlocked(){ goToView('exceptions'); }
+function goToTelemetry(){ goToView('system', 'sys-telemetry'); }
+
 // ── Usage ──
 // Spend is only legible when it can be sliced. A total says "expensive" and nothing more;
 // an anomaly is always a comparison — this agent against the others, this proposal against
