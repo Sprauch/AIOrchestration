@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import shutil
 import signal
 import subprocess
@@ -519,6 +520,11 @@ class Orchestrator:
         try:
             await self.bus.redis.set("orchestrator:session_id", session_id)
             await self.bus.redis.set("orchestrator:session_started", str(time.time()))
+            # Its own pid, so Stop is a targeted signal rather than a process hunt.
+            # The module docstring rejects a PID FILE for deciding whether something
+            # is alive — the heartbeat answers that. This is only ever used to stop a
+            # process the heartbeat has already confirmed is running.
+            await self.bus.redis.set("orchestrator:pid", str(os.getpid()))
         except Exception:
             logger.debug("Could not record session id", exc_info=True)
 

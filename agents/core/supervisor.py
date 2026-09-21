@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -209,3 +210,78 @@ def _log_tail(path: Path, lines: int = 12) -> str:
     if not text:
         return "(no output captured)"
     return "\n".join(text[-lines:])
+
+
+async def stop_orchestrator(redis, grace_seconds: float = 8.0) -> dict:
+    """Stop a running orchestrator, politely first.
+
+    ASKED, THEN TOLD. A running orchestrator holds CLI sessions and may be mid-gate, so it
+    is signalled first and given a few seconds to put itself down; only then is it killed.
+    Pulling the plug on the first attempt would leave worktrees claimed and threads marked
+    in-flight by a process that is no longer there.
+
+    The pid comes from Redis, written by the orchestrator at startup. That is not the PID
+    file this module's docstring rejects: liveness is still decided by the heartbeat, and
+    the pid is used only to signal something already known to be alive.
+    """
+    if not await is_running(redis):
+        return {"stopped": False, "reason": "no orchestrator is running"}
+
+    try:
+        raw = await redis.get("orchestrator:pid")
+        pid = int(raw) if raw else None
+    except (TypeError, ValueError, Exception):
+        pid = None
+
+    if not pid:
+        return {
+            "stopped": False,
+            "reason": (
+                "the running orchestrator did not record a pid — it predates this feature. "
+                "Stop it from the window it is running in, or with: AIO.ps1 stop"
+            ),
+        }
+
+    def _alive() -> bool:
+        try:
+            if os.name == "nt":
+                out = subprocess.run(
+                    ["tasklist", "/FI", f"PID eq {pid}"],
+                    capture_output=True, text=True, timeout=10,
+                )
+                return str(pid) in out.stdout
+            os.kill(pid, 0)
+            return True
+        except Exception:
+            return False
+
+    # Ask.
+    try:
+        if os.name == "nt":
+            # Spawned with CREATE_NEW_PROCESS_GROUP, so it can be signalled as a group.
+            os.kill(pid, signal.CTRL_BREAK_EVENT)
+        else:
+            os.kill(pid, signal.SIGTERM)
+    except Exception:
+        logger.debug("Polite stop signal failed for pid %s", pid, exc_info=True)
+
+    deadline = time.monotonic() + grace_seconds
+    while time.monotonic() < deadline:
+        time.sleep(0.4)
+        if not _alive():
+            logger.info("Orchestrator pid %s stopped on request", pid)
+            return {"stopped": True, "pid": pid, "forced": False}
+
+    # Tell.
+    try:
+        if os.name == "nt":
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
+                           capture_output=True, timeout=15)
+        else:
+            os.kill(pid, signal.SIGKILL)
+    except Exception as exc:
+        return {"stopped": False, "reason": f"could not stop pid {pid}: {exc}"}
+
+    stopped = not _alive()
+    logger.info("Orchestrator pid %s %s", pid, "killed" if stopped else "would not stop")
+    return {"stopped": stopped, "pid": pid, "forced": True}

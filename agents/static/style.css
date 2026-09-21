@@ -1588,3 +1588,12 @@ table.ut th:not(:first-child) { text-align: right; }
      table scroll instead. */
   .card-body:has(table.ut) { overflow-x: auto; }
 }
+
+/* Stop is destructive-adjacent: it interrupts work in flight, so it reads as a warning
+   rather than as the primary action the start button is. */
+.brief-action .ctl-stop {
+  background: var(--surface); color: var(--red-text);
+  border: 1px solid var(--red); font-weight: 600;
+  font-size: 12px; padding: 7px 14px; border-radius: 6px; cursor: pointer;
+}
+.brief-action .ctl-stop:hover { background: var(--red-bg); }

@@ -423,9 +423,14 @@ async function refreshOverview() {
           : 'The PM agent proposes work. Switch to Manual to write proposals yourself.')
         +'">'+modeLabel+'</button>';
       const proposeBtn='<button id="btn-propose" class="ctl-propose" onclick="openProposalForm()">New proposal</button>';
+      // Start when it is down, STOP when it is up. Only ever one of the two, because a
+      // button that cannot do anything is a question the reader has to answer before they
+      // can act ("is it running?") — which the row already answers.
       const startCtl=(statusClass==='bad')
         ? '<button id="btn-start-orch" onclick="startOrchestrator()">Start orchestrator</button>'
-        : '';
+        : (statusClass==='connecting'
+            ? ''
+            : '<button id="btn-stop-orch" class="ctl-stop" onclick="stopOrchestrator()">Stop orchestrator</button>');
       const startBtn='<div class="brief-action">'+startCtl+modeBtn+proposeBtn
         +'<span id="start-orch-msg"></span></div>';
       sb.innerHTML=startBtn+'<div class="brief brief-'+statusClass+'"><div class="brief-dot"></div><div class="brief-text">'+parts.join(' ')+'</div></div>';
@@ -1484,6 +1489,39 @@ async function submitProposal(threadId){
     if(typeof refreshOverview==='function')refreshOverview();
   }catch(e){
     if(msg)msg.textContent='failed: '+e.message;
+  }
+}
+
+async function stopOrchestrator(){
+  // Asked, not told: the server signals first and waits, because a running orchestrator
+  // holds CLI sessions and may be mid-gate. This can therefore take a few seconds.
+  if(!confirm('Stop the orchestrator? Work in flight will be interrupted.'))return;
+  const btn=document.getElementById('btn-stop-orch');
+  const msg=document.getElementById('start-orch-msg');
+  const say=(t)=>{if(msg)msg.textContent=t;};
+  if(btn){btn.disabled=true;btn.textContent='Stopping...';}
+  say('');
+  try{
+    const hdrs=authHeaders();
+    const r=await fetch('/api/orchestrator/stop',{method:'POST',headers:hdrs||{}});
+    if(r.status===401){
+      const t=prompt('Dashboard token required. Run  .\AIO.ps1 pair  and paste the token:');
+      if(t&&isValidToken(t.trim())){localStorage.setItem('gate_token',t.trim());return stopOrchestrator();}
+      say('cancelled');
+      if(btn){btn.disabled=false;btn.textContent='Stop orchestrator';}
+      return;
+    }
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok||!d.stopped){
+      say(d.reason||('failed (HTTP '+r.status+')'));
+      if(btn){btn.disabled=false;btn.textContent='Stop orchestrator';}
+      return;
+    }
+    say(d.forced?'Stopped (it had to be forced).':'Stopped.');
+    if(typeof refreshOverview==='function')refreshOverview();
+  }catch(e){
+    say('failed: '+e.message);
+    if(btn){btn.disabled=false;btn.textContent='Stop orchestrator';}
   }
 }
 

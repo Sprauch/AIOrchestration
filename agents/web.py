@@ -32,6 +32,7 @@ from agents.core.supervisor import (
     is_running,
     last_start_failure,
     spawn_orchestrator,
+    stop_orchestrator,
 )
 from agents.core.thread_guard import THREAD_CYCLES_KEY
 
@@ -95,6 +96,7 @@ class WebDashboard:
         app.router.add_post("/api/proposals", self._handle_submit_proposal)
         app.router.add_get("/api/orchestrator", self._handle_orchestrator_status)
         app.router.add_post("/api/orchestrator/start", self._handle_orchestrator_start)
+        app.router.add_post("/api/orchestrator/stop", self._handle_orchestrator_stop)
         app.router.add_get("/api/gates", self._handle_gates)
         app.router.add_post("/api/gates/{gate_id}/approve", self._handle_gate_approve)
         app.router.add_post("/api/gates/{gate_id}/deny", self._handle_gate_deny)
@@ -1721,6 +1723,18 @@ class WebDashboard:
             "thread_id": env.thread_id,
             "recipient_role": recipient,
         })
+
+    async def _handle_orchestrator_stop(self, request: web.Request) -> web.Response:
+        """Stop the orchestrator. Behind the token, like starting it."""
+        if err := self._check_gate_auth(request):
+            return err
+        result = await stop_orchestrator(self.bus.redis)
+        if result.get("stopped"):
+            clear_start_failure()
+            logger.info("Orchestrator stopped from dashboard (pid %s)", result.get("pid"))
+            return web.json_response(result)
+        logger.warning("Stop request did not stop the orchestrator: %s", result.get("reason"))
+        return web.json_response(result, status=409)
 
     async def _handle_orchestrator_status(self, request: web.Request) -> web.Response:
         """Is one running, and may this caller start one?
