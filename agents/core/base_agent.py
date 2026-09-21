@@ -916,8 +916,20 @@ class AgentProcess(ABC):
         response_channel = f"gate-responses:{gate.id}"
         timeout_ms = self.gate_timeout * 1000
 
+        # READ FROM THE START OF THE CHANNEL, NOT FROM NOW.
+        #
+        # The default "$" means "messages arriving after this read begins", and that loses
+        # the answer in two ways. The console can reply in the window between publishing
+        # the gate above and this read being issued — a plain race, always possible. And
+        # when the connection drops, the retry re-issues the read with a fresh "$" and
+        # cannot see anything published while it was reconnecting; that happened here,
+        # with the connection dropping every few seconds and an approval already granted.
+        #
+        # The channel is created for THIS gate and nothing else is ever published to it,
+        # so reading from "0" can only ever return this gate's answer. It cannot go stale
+        # and it cannot miss.
         response = await self.bus.wait_for_message(
-            response_channel, timeout_ms=timeout_ms,
+            response_channel, timeout_ms=timeout_ms, last_id="0",
         )
 
         if response is None:

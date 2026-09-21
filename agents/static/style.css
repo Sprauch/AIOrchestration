@@ -294,12 +294,24 @@ body {
 .ab-item:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
 .ab-label { font-weight: 600; font-size: 13px; }
 .ab-detail { font-size: 11px; margin-top: 2px; }
-.ab-red { background: var(--red-bg); border: 1px solid rgba(248,113,113,0.12); color: var(--red-text); }
-.ab-red .ab-detail { color: rgba(252,165,165,0.7); }
-.ab-amber { background: var(--yellow-bg); border: 1px solid rgba(251,191,36,0.12); color: var(--yellow-text); }
-.ab-amber .ab-detail { color: rgba(252,211,77,0.7); }
-.ab-green { background: var(--green-bg); border: 1px solid rgba(52,211,153,0.12); color: var(--green-text); }
-.ab-info { background: var(--blue-bg); border: 1px solid rgba(96,165,250,0.12); color: var(--blue); }
+/* THESE WERE DARK-THEME COLOURS ON A LIGHT THEME. The detail line — "Waiting for your
+   decision" — was rgba(252,211,77,0.7): a pale yellow meant to sit on a dark panel, and
+   here it sat on a 6%-yellow tint of white. Measured contrast 1.24:1, where 1.0 is
+   invisible and WCAG AA wants 4.5:1 for body text. The most urgent line on the page was
+   the least readable one.
+   The palette these belong to is light: --yellow-text is #92400e, not a pale amber.
+   Detail lines now use --dim, measured at 6.02:1 on the amber panel and 5.92:1 on the
+   red one, and stay visually subordinate through size and weight rather than by being
+   faded to the point of disappearing. Borders go from 0.12 alpha, which is invisible on
+   white, to 0.3. */
+.ab-red { background: var(--red-bg); border: 1px solid rgba(220,38,38,0.3); color: var(--red-text); }
+.ab-red .ab-detail { color: var(--dim); }
+.ab-amber { background: var(--yellow-bg); border: 1px solid rgba(217,119,6,0.3); color: var(--yellow-text); }
+.ab-amber .ab-detail { color: var(--dim); }
+.ab-green { background: var(--green-bg); border: 1px solid rgba(5,150,105,0.3); color: var(--green-text); }
+.ab-green .ab-detail { color: var(--dim); }
+.ab-info { background: var(--blue-bg); border: 1px solid rgba(37,99,235,0.3); color: var(--blue); }
+.ab-info .ab-detail { color: var(--dim); }
 
 /* ═══ EXCEPTION STRIP ═══ */
 .exc-strip { display: flex; gap: 10px; margin-bottom: 24px; flex-wrap: wrap; }
