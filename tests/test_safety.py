@@ -12,7 +12,7 @@ def checker():
         protected_files=[".env", "vercel.json"],
         branch_prefix="agent/",
         never_push_to=["main", "master"],
-        human_approval_required=["delete_files", "large_change"],
+        user_approval_required=["delete_files", "large_change"],
         max_files_per_change=5,
     ))
 

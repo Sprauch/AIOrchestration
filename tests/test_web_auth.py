@@ -24,7 +24,7 @@ def _make_gate_envelope(gate_id: str = GATE_ID) -> Envelope:
     return Envelope(
         sender_id="developer-1",
         sender_role="developer",
-        message_type=MessageType.HUMAN_GATE,
+        message_type=MessageType.USER_GATE,
         payload={"action": "push_branch", "reason": "needs approval"},
         thread_id="thread-001",
         id=gate_id,
@@ -36,7 +36,7 @@ def _fake_redis(gate_envelope: Envelope | None = None):
     redis = AsyncMock()
 
     async def _xrange(key, *a, **kw):
-        if "human-gates" in key and gate_envelope is not None:
+        if "user-gates" in key and gate_envelope is not None:
             return [("1-0", {"data": gate_envelope.to_json()})]
         return []
 

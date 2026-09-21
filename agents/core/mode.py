@@ -1,4 +1,4 @@
-"""Who proposes the work: the PM agent, or a person.
+"""Who proposes the work: the PM agent, or a user.
 
 TWO MODES, AND THE DIFFERENCE IS ONLY THE FIRST STAGE.
 
@@ -6,12 +6,12 @@ TWO MODES, AND THE DIFFERENCE IS ONLY THE FIRST STAGE.
              when there is no obvious next step and the point is to be shown something
              you would not have thought of.
 
-  MANUAL     A person writes the proposals. The PM agent does not run. Everything below
+  MANUAL     A user writes the proposals. The PM agent does not run. Everything below
              is unchanged, because the architect subscribes to a stream of proposals and
              has never cared how one arrived.
 
-Nothing else in the pipeline is mode-aware, deliberately. A proposal written by a person is
-an ordinary proposal envelope with sender_role "person", and it routes by target_area exactly
+Nothing else in the pipeline is mode-aware, deliberately. A proposal written by a user is
+an ordinary proposal envelope with sender_role "user", and it routes by target_area exactly
 as the PM's do, so a user-facing one still reaches the product designer first.
 
 STORED IN REDIS, NOT IN CONFIG, because the switch has to work while the orchestrator is

@@ -56,7 +56,7 @@ def test_envelope_defaults():
 def test_message_type_values():
     assert MessageType.PROPOSAL.value == "proposal"
     assert MessageType.REVIEW_RESULT.value == "review_result"
-    assert MessageType.HUMAN_GATE.value == "human_gate"
+    assert MessageType.USER_GATE.value == "user_gate"
     assert MessageType.CLI_TRACE.value == "cli_trace"
 
 

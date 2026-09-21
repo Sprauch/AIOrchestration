@@ -124,7 +124,7 @@ class FakeBus:
     ) -> Envelope | None:
         """Block for one message on `channel`, or return None when the wait expires.
 
-        The double had drifted from MessageBus, which grew this method for the human
+        The double had drifted from MessageBus, which grew this method for the user
         approval gate: base_agent blocks on a per-gate response channel, so without it
         every gated action raised AttributeError instead of waiting. Mirrors the real
         contract — a reply is returned, an expired wait returns None rather than raising.
@@ -140,7 +140,7 @@ class FakeBus:
         self._queue.put_nowait(envelope)
 
     def respond(self, channel: str, envelope: Envelope):
-        """Answer a waiter blocked on `channel` — the approval a human would give."""
+        """Answer a waiter blocked on `channel` — the approval a user would give."""
         self._responses.setdefault(channel, asyncio.Queue()).put_nowait(envelope)
 
 
@@ -401,7 +401,7 @@ async def test_gate_lifecycle_create_timeout_resolved():
     safety = SafetyChecker(SafetyConfig(
         branch_prefix="agent/",
         protected_files=[".env"],
-        human_approval_required=["large_change"],
+        user_approval_required=["large_change"],
         max_files_per_change=3,
     ))
     bus = FakeBus()
@@ -412,7 +412,7 @@ async def test_gate_lifecycle_create_timeout_resolved():
         gate_timeout=1,
     )
 
-    # Trigger a large change that requires human approval
+    # Trigger a large change that requires user approval
     env = Envelope(
         sender_id="dev-1", sender_role="developer",
         message_type=MessageType.REVIEW_REQUEST,
@@ -421,10 +421,10 @@ async def test_gate_lifecycle_create_timeout_resolved():
     result = await dev._check_output_safety(env)
     assert result is False  # Timed out, so blocked
 
-    # Verify: 1) HUMAN_GATE was created
+    # Verify: 1) USER_GATE was created
     gates = [
         (ch, e) for ch, e in bus.published
-        if e.message_type == MessageType.HUMAN_GATE
+        if e.message_type == MessageType.USER_GATE
     ]
     assert len(gates) == 1
     gate_id = gates[0][1].id
@@ -446,7 +446,7 @@ async def test_gate_lifecycle_create_timeout_resolved():
     # Publish a second (duplicate) resolution event for the same gate
     from agents.core.message import Envelope as Env
     dup_env = Env(
-        sender_id="human", sender_role="human",
+        sender_id="user", sender_role="user",
         message_type=MessageType.SYSTEM,
         payload={"action": "approval_granted", "gate_id": gate_id},
     )

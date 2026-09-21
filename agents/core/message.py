@@ -45,7 +45,7 @@ class MessageType(str, Enum):
     TASK_PROGRESS = "task_progress"
     REVIEW_REQUEST = "review_request"
     REVIEW_RESULT = "review_result"
-    HUMAN_GATE = "human_gate"
+    USER_GATE = "user_gate"
     CLI_TRACE = "cli_trace"
 
 

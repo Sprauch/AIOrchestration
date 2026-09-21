@@ -17,7 +17,7 @@ So a refusal is recorded with the message it refused, and there are two ways bac
              that no longer exists, so reusing its conclusion would be reusing a stale
              premise. This asks for the work to be thought through again.
 
-Which one applies is a judgement about whether the CONTEXT changed, and only a person can
+Which one applies is a judgement about whether the CONTEXT changed, and only a user can
 make it. Both are offered; neither is guessed at.
 
 Timeouts are recorded the same way. An expired gate is refused rather than allowed, and

@@ -93,7 +93,7 @@ def test_pm_trigger_without_context():
 
 @pytest.mark.asyncio
 async def test_protected_file_escalates_to_gate_in_dogfood():
-    """In dogfood mode, protected file violation escalates to human gate."""
+    """In dogfood mode, protected file violation escalates to user gate."""
     from agents.core.base_agent import AgentProcess
     from agents.core.message_bus import MessageBus
 
@@ -113,8 +113,8 @@ async def test_protected_file_escalates_to_gate_in_dogfood():
     bus.redis = MagicMock()
     bus.publish = AsyncMock()
     bus.wait_for_message = AsyncMock(return_value=Envelope(
-        sender_id="human",
-        sender_role="human",
+        sender_id="user",
+        sender_role="user",
         message_type=MessageType.SYSTEM,
         payload={"action": "approval_granted"},
     ))
@@ -138,17 +138,17 @@ async def test_protected_file_escalates_to_gate_in_dogfood():
 
     result = await agent._check_output_safety(envelope)
 
-    # Should have escalated to human gate (publish called for gate)
+    # Should have escalated to user gate (publish called for gate)
     assert bus.publish.called
     gate_call = bus.publish.call_args_list[0]
-    assert "human-gates" in gate_call[0][0]
+    assert "user-gates" in gate_call[0][0]
     # And since we returned approval_granted, result should be True
     assert result is True
 
 
 @pytest.mark.asyncio
 async def test_protected_file_denied_blocks_in_dogfood():
-    """In dogfood mode, protected file violation denied by human blocks the publish."""
+    """In dogfood mode, protected file violation denied by user blocks the publish."""
     from agents.core.base_agent import AgentProcess
     from agents.core.message_bus import MessageBus
 
@@ -168,8 +168,8 @@ async def test_protected_file_denied_blocks_in_dogfood():
     bus.redis = MagicMock()
     bus.publish = AsyncMock()
     bus.wait_for_message = AsyncMock(return_value=Envelope(
-        sender_id="human",
-        sender_role="human",
+        sender_id="user",
+        sender_role="user",
         message_type=MessageType.SYSTEM,
         payload={"action": "approval_denied"},
     ))

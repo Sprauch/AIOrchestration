@@ -246,7 +246,7 @@ def _known_env_vars(config: OrchestratorConfig | None = None) -> set[str]:
 def check_env_var_typos(config: OrchestratorConfig | None = None) -> list[str]:
     """Check for likely typos in AGENT_ORCH_* env vars.
 
-    Returns a list of human-readable warning strings (one per suspicious var).
+    Returns a list of user-readable warning strings (one per suspicious var).
     Warnings are advisory — they never raise or block startup.
     """
     known = _known_env_vars(config)

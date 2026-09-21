@@ -581,7 +581,7 @@ body {
 .tn-why { color: var(--yellow-text); }
 .tn-next { color: var(--green-text); }
 .tn-blocker { padding: 10px 14px; background: var(--red-bg); border: 1px solid rgba(248,113,113,0.12); border-radius: var(--radius-sm); font-size: 12px; color: var(--red-text); margin-top: 4px; }
-.tn-human { padding: 8px 14px; background: var(--accent-soft); border: 1px solid rgba(212,168,83,0.15); border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; color: var(--accent); margin-top: 4px; }
+.tn-user { padding: 8px 14px; background: var(--accent-soft); border: 1px solid rgba(212,168,83,0.15); border-radius: var(--radius-sm); font-size: 12px; font-weight: 600; color: var(--accent); margin-top: 4px; }
 
 /* ═══ LATEST CHANGE ═══ */
 .latest-change {
@@ -680,7 +680,7 @@ body {
 .tl-dot.review_request { border-color: var(--purple); }
 .tl-dot.review_result { border-color: var(--purple); background: var(--purple); }
 .tl-dot.system { border-color: var(--subtle); }
-.tl-dot.human_gate { border-color: var(--red); }
+.tl-dot.user_gate { border-color: var(--red); }
 .tl-head { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--dim); }
 .tl-meta { font-size: 10px; color: var(--subtle); margin-top: 2px; font-family: var(--mono); }
 .tl-body { font-size: 12px; color: var(--text); margin-top: 4px; line-height: 1.5; }
@@ -1515,3 +1515,20 @@ tr.click { cursor: pointer; }
   text-transform: uppercase; color: var(--subtle); margin-bottom: 6px;
 }
 .retro-spec-purpose p { font-size: 13px; color: var(--text); line-height: 1.65; margin: 0; }
+
+/* ── Phase strip: what is happening, and what is waiting on you ───────────
+   Two states the reader must tell apart at a glance. BOLD is a role working on
+   something — it will resolve itself. UNDERLINED is a role stopped at a gate — it
+   resolves only when the user decides. Formatting rather than colour, so it survives
+   a colourblind reader and a phone in sunlight. */
+.phase-step.active .phase-label { font-weight: 700; color: var(--text); }
+.phase-step.awaiting .phase-label {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--yellow);
+  color: var(--yellow-text);
+}
+.phase-step.awaiting .phase-num {
+  background: var(--yellow-bg); color: var(--yellow-text); border-color: var(--yellow);
+}

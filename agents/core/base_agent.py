@@ -428,7 +428,7 @@ class AgentProcess(ABC):
         Developer/Reviewer: never gated (they drain the pipeline)
         """
         if self.role == "pm":
-            # MANUAL MODE: a person writes the proposals, so the PM does not.
+            # MANUAL MODE: a user writes the proposals, so the PM does not.
             # Enforced here rather than by not starting the agent, so the mode can be
             # switched while the orchestrator runs without tearing an agent down
             # mid-message. Every other role is unaffected - such a proposal is an
@@ -601,17 +601,48 @@ class AgentProcess(ABC):
                     pass
             else:
                 logger.exception("Agent %s error processing message %s", self.agent_id, envelope.id[:8])
+                await self._record_error(envelope, e)
             if self._metrics:
                 await self._metrics.increment(f"errors:{self.role}")
                 await self._metrics.increment("errors:total")
-        except Exception:
+        except Exception as exc:
             logger.exception("Agent %s error processing message %s", self.agent_id, envelope.id[:8])
+            await self._record_error(envelope, exc)
             if self._metrics:
                 await self._metrics.increment(f"errors:{self.role}")
                 await self._metrics.increment("errors:total")
         finally:
             clear_correlation()
             await self._set_status("active")
+
+    async def _record_error(self, envelope, exc: BaseException) -> None:
+        """Publish what went wrong, not just that something did.
+
+        The counters said "errors:architect: 17" and nothing else. A number tells a reader
+        that something is broken and gives them no way to find out what — the detail was in
+        a log file on the machine, which is no use to anyone reading the dashboard from a
+        phone. This puts the actual failure where the interface can show it.
+
+        Never raises: an error while recording an error must not replace the original.
+        """
+        try:
+            await self.bus.publish("system", Envelope(
+                sender_id=self.agent_id,
+                sender_role=self.role,
+                message_type=MessageType.SYSTEM,
+                payload={
+                    "action": "agent_error",
+                    "agent_id": self.agent_id,
+                    "role": self.role,
+                    "error_type": type(exc).__name__,
+                    "error": str(exc),
+                    "message_type": envelope.message_type.value if envelope else "",
+                    "at": datetime.now(timezone.utc).isoformat(),
+                },
+                thread_id=envelope.thread_id if envelope else "",
+            ))
+        except Exception:
+            logger.debug("Could not publish agent_error event", exc_info=True)
 
     async def _prepare_and_publish_check(self, envelope: Envelope) -> bool:
         """Normalize payload, check dedup, and enforce thread cycle limits.
@@ -679,7 +710,7 @@ class AgentProcess(ABC):
 
         Inspects file lists and branch names in outgoing messages.
         Hard violations return False (blocked). Escalatable actions emit a
-        HUMAN_GATE message and block until a human approves or denies.
+        USER_GATE message and block until a user approves or denies.
         Returns True if safe to publish, False if blocked or denied.
         """
         if not self.safety:
@@ -698,7 +729,7 @@ class AgentProcess(ABC):
         # Gating create_pr alone was too late: that stops the OUTPUT of work already paid
         # for. This stops the work itself, at the one point where saying no is still cheap.
         #
-        # Enabled by listing "assign_task" in safety.human_approval_required. Left out,
+        # Enabled by listing "assign_task" in safety.user_approval_required. Left out,
         # nothing changes and the architect dispatches as before.
         if (
             envelope.message_type == MessageType.TASK_ASSIGNMENT
@@ -717,7 +748,7 @@ class AgentProcess(ABC):
                     "testing_strategy": payload.get("testing_strategy", ""),
                 },
             )
-            approved = await self._request_human_approval(
+            approved = await self._request_user_approval(
                 action="assign_task",
                 reason=(payload.get("approach", "") or "task assignment").split("\n")[0],
                 context=ctx,
@@ -749,7 +780,7 @@ class AgentProcess(ABC):
                 logger.warning("Agent %s output blocked: %s", self.agent_id, e)
                 return False
 
-        # Check file lists — may escalate to human gate
+        # Check file lists — may escalate to user gate
         for file_key in ("files_to_modify", "files_to_create", "files_changed"):
             files = payload.get(file_key, [])
             if files:
@@ -765,7 +796,7 @@ class AgentProcess(ABC):
                             safety_summary="escalated",
                             escalation_reason=f"{len(files)} files in {file_key}",
                         )
-                        approved = await self._request_human_approval(
+                        approved = await self._request_user_approval(
                             action=escalation,
                             reason=f"{len(files)} files in {file_key}",
                             context=ctx,
@@ -785,7 +816,7 @@ class AgentProcess(ABC):
                             safety_summary="escalated",
                             escalation_reason=str(e),
                         )
-                        approved = await self._request_human_approval(
+                        approved = await self._request_user_approval(
                             action="protected_file",
                             reason=str(e),
                             context=ctx,
@@ -809,12 +840,12 @@ class AgentProcess(ABC):
 
         return True
 
-    async def _request_human_approval(
+    async def _request_user_approval(
         self, action: str, reason: str, context: dict | str, thread_id: str,
     ) -> bool:
-        """Emit a HUMAN_GATE message and wait for approval or denial.
+        """Emit a USER_GATE message and wait for approval or denial.
 
-        Publishes the gate to stream:human-gates, then blocks on
+        Publishes the gate to stream:user-gates, then blocks on
         stream:gate-responses:{gate_id} using XREAD. The approval console
         publishes the response to that per-gate channel. This is a blocking
         wait (no polling) with a configurable timeout.
@@ -824,7 +855,7 @@ class AgentProcess(ABC):
         gate = Envelope(
             sender_id=self.agent_id,
             sender_role=self.role,
-            message_type=MessageType.HUMAN_GATE,
+            message_type=MessageType.USER_GATE,
             payload={
                 "action": action,
                 "reason": reason,
@@ -832,9 +863,9 @@ class AgentProcess(ABC):
             },
             thread_id=thread_id,
         )
-        await self.bus.publish("human-gates", gate)
+        await self.bus.publish("user-gates", gate)
         logger.info(
-            "Agent %s awaiting human approval for %s (gate %s)",
+            "Agent %s awaiting user approval for %s (gate %s)",
             self.agent_id, action, gate.id[:8],
         )
 
@@ -869,13 +900,13 @@ class AgentProcess(ABC):
 
         decision = response.payload.get("action", "")
         if decision == "approval_granted":
-            logger.info("Human approved gate %s", gate.id[:8])
+            logger.info("User approved gate %s", gate.id[:8])
             if self._metrics:
                 await self._metrics.increment("gates:approved")
             return True
 
         self._last_gate_outcome = "denied"
-        logger.info("Human denied gate %s (action=%s)", gate.id[:8], decision)
+        logger.info("User denied gate %s (action=%s)", gate.id[:8], decision)
         if self._metrics:
             await self._metrics.increment("gates:denied")
         return False
@@ -890,7 +921,7 @@ class AgentProcess(ABC):
             MessageType.TASK_PROGRESS: "progress",
             MessageType.REVIEW_REQUEST: "review-requests",
             MessageType.REVIEW_RESULT: "review-results",
-            MessageType.HUMAN_GATE: "human-gates",
+            MessageType.USER_GATE: "user-gates",
             MessageType.CLI_TRACE: "cli-traces",
             MessageType.SYSTEM: "system",
         }

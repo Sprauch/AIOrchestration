@@ -93,3 +93,20 @@ line numbers, what you observed - and stop. What is limited is the NUMBER of poi
 you may make, so spend them on what matters:
 - At most 6 `recommendations` and 8 `target_surfaces`. Prefer a few strong
   recommendations, each explained well enough to act on.
+
+## How it reads
+
+Everything you write here is read by a user, often on a phone. Write it to be read, not
+to fit.
+
+- **Break it up.** A blank line between points. One idea per paragraph. A wall of text is
+  skipped, and a skipped explanation may as well not have been written.
+- **Lead with the point**, then support it. Do not build to a conclusion — the reader may
+  stop before reaching it.
+- **Use a list when you have a list.** Three findings are three bullets, not one sentence
+  with two semicolons.
+- **Say the thing plainly.** The reader is deciding whether to approve work, not marking an
+  exam; density is not rigour.
+
+Packing the most information into the least space is the wrong goal. Being understood on
+the first read is the goal.

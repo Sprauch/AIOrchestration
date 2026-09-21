@@ -46,7 +46,7 @@ function evDetail(type,p) {
     }
     case 'task_assignment':return esc(p.branch_name||'');case 'task_progress':return esc(p.status||'');
     case 'review_request':return esc(p.branch_name||'');case 'review_result':return (p.decision||'').toUpperCase();
-    case 'human_gate':return esc(p.action||'');
+    case 'user_gate':return esc(p.action||'');
     case 'system':{const a=p.action||'';if(a==='pr_created')return 'PR created: '+esc((p.pr_status||''));if(a==='pr_merged')return 'PR merged: '+esc((p.pr_status||''));if(a==='pr_closed')return 'PR closed: '+esc((p.pr_status||''));if(a==='pr_failed')return 'PR failed: '+esc((p.detail||''));if(a==='pr_skipped')return 'PR skipped: '+esc((p.detail||''));if(a==='cli_timeout')return esc(p.agent_id||'')+' timed out ('+p.timeout_seconds+'s)';return esc(a);}
     default:return type.replace(/_/g,' ');
   }
@@ -173,9 +173,16 @@ function renderPhaseIndicator(phaseData) {
     const connector = i > 0
       ? '<div class="phase-connector' + ((p.state === 'completed' || p.state === 'active') ? ' done' : '') + '"></div>'
       : '';
+    // BOLD = working on something. UNDERLINED = stopped, waiting on your decision.
+    // Both halt the pipeline, and the reader needs to tell them apart at a glance: one
+    // resolves itself, the other resolves only when you do something about it.
+    const cls = 'phase-step ' + (p.state || 'inactive') + (p.awaiting ? ' awaiting' : '');
+    const title = p.awaiting
+      ? (p.label || p.name) + ' — waiting for your decision'
+      : (p.label || '');
     return connector
-      + '<div class="phase-step ' + (p.state || 'inactive') + '" data-phase="' + esc(p.name) + '"'
-      + ' title="' + esc(p.label || '') + '">'
+      + '<div class="' + cls + '" data-phase="' + esc(p.name) + '"'
+      + ' title="' + esc(title) + '">'
       + '<span class="phase-num">' + (i + 1) + '</span>'
       + '<span class="phase-label">' + esc(p.short || p.name) + '</span>'
       + '</div>';
@@ -186,6 +193,15 @@ function renderPhaseIndicator(phaseData) {
 function toggleErrorPanel(){
   document.getElementById('error-summary-panel').classList.toggle('collapsed');
 }
+// Agent errors, with their actual messages. Counters alone could never answer "what
+// broke?", which is the only question a reader of an error panel has.
+async function refreshAgentErrors(){
+  try{
+    const d = await (await fetch('/api/errors')).json();
+    window.agentErrors = d.errors || [];
+  }catch(e){ window.agentErrors = window.agentErrors || []; }
+}
+
 function renderErrorSummary(exceptions, metrics, threads) {
   const el = document.getElementById('error-summary-content');
   if (!el) return;
@@ -236,19 +252,36 @@ function renderErrorSummary(exceptions, metrics, threads) {
     });
   });
 
-  // Error metrics from snapshot — warning severity
-  var mt = metrics || {};
-  Object.keys(mt).forEach(function(k) {
-    if (k.startsWith('errors:') && parseInt(mt[k]) > 0) {
-      errors.push({
-        time: '',
-        source: 'system',
-        sourceRole: 'system',
-        desc: k.replace(/_/g, ' ') + ': ' + mt[k],
-        severity: 'warning'
-      });
-    }
+  // WHAT WENT WRONG, not how many times. This listed raw counter keys —
+  // "errors:architect: 17" — which tells a reader something is broken and gives them no
+  // way to find out what. The actual failures are published as agent_error events now,
+  // so the real message is shown and the counters are reduced to a single total that
+  // says how much is not displayed.
+  (window.agentErrors || []).forEach(function(e) {
+    errors.push({
+      time: e.time || '',
+      source: e.role || 'agent',
+      sourceRole: e.role || 'system',
+      desc: (e.agent_id || e.role || 'agent') + ' — ' + (e.error_type || 'Error') + ': '
+            + (e.error || 'no detail')
+            + (e.message_type ? ' (while handling a ' + e.message_type.replace(/_/g, ' ') + ')' : ''),
+      severity: 'critical'
+    });
   });
+
+  var mt = metrics || {};
+  var totalErrors = parseInt(mt['errors:total'] || 0);
+  var shown = (window.agentErrors || []).length;
+  if (totalErrors > shown) {
+    errors.push({
+      time: '',
+      source: 'system',
+      sourceRole: 'system',
+      desc: totalErrors + ' errors counted in total; ' + shown + ' recorded with detail. '
+            + 'Older ones predate error recording, or their detail has aged out of the stream.',
+      severity: 'warning'
+    });
+  }
 
   // Threads with failed status — critical
   (threads || []).forEach(function(t) {
@@ -369,7 +402,7 @@ async function refreshOverview() {
       // to a second orchestrator against one Redis.
       // Only when genuinely down. Not while connecting: the start is already in flight,
       // and a second click would be refused by the server anyway - offering it invites a
-      // person to believe the first one failed.
+      // user to believe the first one failed.
       // The mode toggle and the proposal form sit beside the start button and are ALWAYS
       // available, including while the orchestrator is stopped. That is not a compromise:
       // Redis is a service in its own right, and agents replay each stream from the
@@ -772,7 +805,7 @@ async function showThread(tid) {
     if(t.why)n+='<div class="tn-field"><span class="tn-field-label">Why</span><span class="tn-field-value tn-why">'+esc(t.why)+'</span></div>';
     if(t.blocked_reason)n+='<div class="tn-blocker">'+esc(t.blocked_reason)+'</div>';
     if(t.next_step)n+='<div class="tn-field"><span class="tn-field-label">Next Step</span><span class="tn-field-value tn-next">'+esc(t.next_step)+'</span></div>';
-    if(t.needs_human)n+='<div class="tn-human">Human decision needed</div>';
+    if(t.needs_user)n+='<div class="tn-user">User decision needed</div>';
     n+='</div></div>';
     document.getElementById('thread-narrative').innerHTML=n;
 
@@ -1114,7 +1147,7 @@ async function gateAction(id,action){const h={method:'POST'};const hdrs=authHead
 // 401, retried once. That means pairing a phone once works for approvals AND for this.
 // ── Refused work ──
 // A refusal is not a deletion. Two ways back, and which one applies is a judgement about
-// whether the PROJECT moved — only a person can make it, so both are offered and neither
+// whether the PROJECT moved — only a user can make it, so both are offered and neither
 // is guessed at.
 async function renderRefused(){
   const el=document.getElementById('refused-work');
@@ -1178,7 +1211,7 @@ function fmtDuration(hours){
 }
 
 // ── Decision gates ──
-// The rules already governed every run; they just were not stated anywhere a person
+// The rules already governed every run; they just were not stated anywhere a user
 // looks. Not knowing them produced exactly the alarm they exist to prevent — work
 // showing as "approved" with no approval given, because that word meant the architect's
 // decision and nothing said so.
@@ -1668,6 +1701,7 @@ function authHeaders(){
 // button. The button renders as unknown until the mode arrives instead, which is honest
 // and costs nothing.
 refreshMode();
+refreshAgentErrors();
 refreshOverview();
-setInterval(()=>{refreshMode();refreshOverview();},5000);
+setInterval(()=>{refreshMode();refreshAgentErrors();refreshOverview();},5000);
 window.addEventListener('resize',()=>{if(lastSnap){renderPipelineMini(lastSnap.agents,lastSnap.challengers||{},lastSnap.backpressure);renderPipelineFull(lastSnap.agents,lastSnap.challengers||{},lastSnap.backpressure);}});

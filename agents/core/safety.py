@@ -15,7 +15,7 @@ class SafetyConfig(BaseModel):
     protected_files: list[str] = Field(default_factory=list)
     branch_prefix: str = "agent/"
     never_push_to: list[str] = Field(default_factory=lambda: ["main", "master"])
-    human_approval_required: list[str] = Field(default_factory=list)
+    user_approval_required: list[str] = Field(default_factory=list)
     max_files_per_change: int = 10
 
 
@@ -32,7 +32,7 @@ class SafetyChecker:
     """Evaluates messages and actions against safety rules.
 
     Hard blocks raise SafetyViolation immediately.
-    Escalatable actions return an action string for human approval gating.
+    Escalatable actions return an action string for user approval gating.
     """
 
     def __init__(self, config: SafetyConfig):
@@ -50,7 +50,7 @@ class SafetyChecker:
     def check_files(self, files: list[str]) -> str | None:
         """Check file list for protected files and large changes.
 
-        Returns None if OK, or an escalation action string if human approval needed.
+        Returns None if OK, or an escalation action string if user approval needed.
         Raises SafetyViolation for hard-blocked files.
         """
         for f in files:
@@ -72,7 +72,7 @@ class SafetyChecker:
                     raise SafetyViolation("protected_file", f"Cannot modify {f}")
 
         if len(files) > self.config.max_files_per_change:
-            if "large_change" in self.config.human_approval_required:
+            if "large_change" in self.config.user_approval_required:
                 return "large_change"
 
         return None
@@ -91,8 +91,8 @@ class SafetyChecker:
             raise SafetyViolation("never_push_to", f"Cannot push to '{target}'")
 
     def needs_approval(self, action: str) -> bool:
-        """Check if an action requires human approval."""
-        return action in self.config.human_approval_required
+        """Check if an action requires user approval."""
+        return action in self.config.user_approval_required
 
     def classify_files(self, files: list[str]) -> list[dict[str, str | bool]]:
         """Classify files as protected/sensitive for gate context.
@@ -118,7 +118,7 @@ def build_gate_context(
     escalation_reason: str = "",
     extra: dict | None = None,
 ) -> dict:
-    """Build a structured context dict for HUMAN_GATE payloads.
+    """Build a structured context dict for USER_GATE payloads.
 
     Parameters
     ----------
@@ -145,7 +145,7 @@ def build_gate_context(
     if branch is not None:
         ctx["branch"] = branch
     if files is not None:
-        ctx["files"] = files  # a human approving a change must see every file in it
+        ctx["files"] = files  # a user approving a change must see every file in it
     if file_count is not None:
         ctx["file_count"] = file_count
     if extra:

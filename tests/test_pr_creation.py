@@ -39,7 +39,7 @@ def make_orchestrator() -> Orchestrator:
     orch = Orchestrator()
     orch.config = SimpleNamespace(
         system=SimpleNamespace(working_dir=".", pr_max_retries=2, pr_retry_delay=0, gate_timeout=5),
-        safety=SimpleNamespace(human_approval_required=[]),
+        safety=SimpleNamespace(user_approval_required=[]),
     )
     async def _noop_publish(*a, **kw): return "0-0"
     orch.bus = SimpleNamespace(redis=FakeRedis(), publish=_noop_publish)

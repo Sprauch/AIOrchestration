@@ -679,12 +679,12 @@ class Orchestrator:
                     logger.exception("Failed to surface stalled pipeline for %s/%s", stage, thread_id[:8])
 
     async def _publish_startup_triggers(self) -> None:
-        # MANUAL MODE: nothing kicks the PM, because the human supplies the proposals.
+        # MANUAL MODE: nothing kicks the PM, because the user supplies the proposals.
         # The PM agent also stands down on its own (see base_agent), so this is belt and
         # braces rather than the only guard - but without it a restart in manual mode
         # would still hand the PM one free turn.
         if await get_mode(self.bus.redis, self.config.system.mode) == MANUAL:
-            logger.info("Manual mode: no PM trigger — proposals come from the human")
+            logger.info("Manual mode: no PM trigger — proposals come from the user")
             return
 
         # Per-stage check: count unresolved design + proposal backlog for PM trigger decision
@@ -784,12 +784,12 @@ class Orchestrator:
             await self._audit_pr(thread_id, "skipped", "gh not found")
             return
 
-        # Human approval gate for PR creation (if configured)
-        if "create_pr" in self.config.safety.human_approval_required:
+        # User approval gate for PR creation (if configured)
+        if "create_pr" in self.config.safety.user_approval_required:
             gate = Envelope(
                 sender_id="orchestrator",
                 sender_role="system",
-                message_type=MessageType.HUMAN_GATE,
+                message_type=MessageType.USER_GATE,
                 payload={
                     "action": "create_pr",
                     "reason": f"PR for: {title}",
@@ -803,8 +803,8 @@ class Orchestrator:
                 },
                 thread_id=thread_id,
             )
-            await self.bus.publish("human-gates", gate)
-            logger.info("Awaiting human approval for PR creation: %s (gate %s)", branch, gate.id[:8])
+            await self.bus.publish("user-gates", gate)
+            logger.info("Awaiting user approval for PR creation: %s (gate %s)", branch, gate.id[:8])
             await self._audit_pr(thread_id, "awaiting_approval", f"branch={branch}")
 
             response = await self.bus.wait_for_message(
@@ -814,7 +814,7 @@ class Orchestrator:
             if response is None or response.payload.get("action") != "approval_granted":
                 reason = "timed out" if response is None else "denied"
                 logger.info("PR creation %s for %s", reason, branch)
-                await self._audit_pr(thread_id, "skipped", f"human {reason}")
+                await self._audit_pr(thread_id, "skipped", f"user {reason}")
                 return
 
         branch_ready, detail = await self._prepare_branch_for_pr(branch)

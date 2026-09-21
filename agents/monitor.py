@@ -7,7 +7,7 @@ Tab-based dashboard:
   [4] Redis     — raw stream data showing everything flowing through pipes
   [5] Metrics   — live counters from orchestrator:metrics
   [6] Threads   — drill into a single proposal end-to-end
-  [7] Approve   — approve/deny human gates (flashes when gates arrive)
+  [7] Approve   — approve/deny user gates (flashes when gates arrive)
 
 Press 1-7 or click tabs. Arrow keys to scroll. Enter to expand/collapse traces.
 In Threads tab: select a row to see the full timeline.
@@ -42,12 +42,12 @@ from agents.core.state import load_snapshot_from_connection
 
 ROLE_ICONS = {
     "pm": "PM", "product_designer": "PD", "architect": "ARCH", "developer": "DEV",
-    "reviewer": "REV", "system": "SYS", "human": "HMN",
+    "reviewer": "REV", "system": "SYS", "user": "HMN",
     "challenger": "CHAL",
 }
 ROLE_COLORS = {
     "pm": "blue", "product_designer": "cyan", "architect": "yellow", "developer": "green",
-    "reviewer": "magenta", "system": "white", "human": "cyan",
+    "reviewer": "magenta", "system": "white", "user": "cyan",
     "challenger": "red",
 }
 
@@ -70,7 +70,7 @@ DECISION_DISPLAY = {
 
 ALL_CHANNELS = [
     "proposals", "design-feedback", "reviews", "tasks", "review-requests",
-    "review-results", "progress", "human-gates", "cli-traces", "system",
+    "review-results", "progress", "user-gates", "cli-traces", "system",
 ]
 
 CHANNEL_FOR_TYPE = {
@@ -79,7 +79,7 @@ CHANNEL_FOR_TYPE = {
     "proposal_review": "reviews", "task_assignment": "tasks",
     "task_progress": "progress", "review_request": "review-requests",
     "review_result": "review-results", "cli_trace": "cli-traces",
-    "human_gate": "human-gates", "system": "system",
+    "user_gate": "user-gates", "system": "system",
 }
 
 
@@ -339,7 +339,7 @@ class MonitorApp(App):
             # Developer made progress — clear from changes_requested if reworking
             if env.payload.get("status") == "completed":
                 self._changes_requested.pop(env.thread_id, None)
-        elif env.message_type == MessageType.HUMAN_GATE:
+        elif env.message_type == MessageType.USER_GATE:
             self.pending_gates += 1
             self._pending_gate_ids.add(env.id)
             if env.id not in self._handled_gate_ids:
@@ -599,7 +599,7 @@ class MonitorApp(App):
             t.append(f"[{di}] REVIEW {d.upper()}", style=f"bold {ds}")
             if target:
                 t.append(f" -> {target}", style="dim")
-        elif mt == "human_gate":
+        elif mt == "user_gate":
             action = p.get("action", "?")
             reason = p.get("reason", "")
             t.append(f"APPROVAL NEEDED: {action}", style="bold red")
@@ -790,7 +790,7 @@ class MonitorApp(App):
         elif self._total_count > 0:
             items.append(f"  [!] STALE: orchestrator — no heartbeat detected")
 
-        # Pending human gates
+        # Pending user gates
         if self._pending_gate_ids:
             items.append(f"  [?] WAITING: {len(self._pending_gate_ids)} pending approval gate(s) — run `agent-orchestrator approve`")
 
@@ -995,7 +995,7 @@ class MonitorApp(App):
             MessageType.TASK_PROGRESS: "PROGRESS",
             MessageType.REVIEW_REQUEST: "REVIEW REQ",
             MessageType.REVIEW_RESULT: "REVIEW",
-            MessageType.HUMAN_GATE: "GATE",
+            MessageType.USER_GATE: "GATE",
         }
 
         for env in events:
@@ -1088,7 +1088,7 @@ class MonitorApp(App):
                 for b in blocking[:3]:
                     self._timeline_detail(log, "Blocking", b)
 
-            elif mt == MessageType.HUMAN_GATE:
+            elif mt == MessageType.USER_GATE:
                 self._timeline_detail(log, "Action", p.get("action", "?"))
                 self._timeline_detail(log, "Reason", p.get("reason", ""))
 
@@ -1172,8 +1172,8 @@ class MonitorApp(App):
     async def _respond_to_gate(self, gate: Envelope, action: str) -> None:
         """Publish approval response — same logic as the standalone console."""
         response = Envelope(
-            sender_id="human",
-            sender_role="human",
+            sender_id="user",
+            sender_role="user",
             message_type=MessageType.SYSTEM,
             payload={"action": action, "gate_id": gate.id},
             thread_id=gate.thread_id,

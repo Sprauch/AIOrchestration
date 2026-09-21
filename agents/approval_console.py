@@ -1,4 +1,4 @@
-"""Interactive console for handling human approval gates."""
+"""Interactive console for handling user approval gates."""
 
 from __future__ import annotations
 
@@ -13,8 +13,8 @@ from agents.core.message_bus import MessageBus
 logger = logging.getLogger(__name__)
 
 
-class HumanApprovalConsole:
-    """Interactive console for handling human approval gates.
+class UserApprovalConsole:
+    """Interactive console for handling user approval gates.
 
     On startup, replays all existing pending gates from stream history
     so gates published before the console started are not missed.
@@ -32,14 +32,14 @@ class HumanApprovalConsole:
 
     async def run(self) -> None:
         await self.bus.connect()
-        print("\n=== Human Approval Console ===")
+        print("\n=== User Approval Console ===")
 
         await self._replay_pending_gates()
 
         print("Watching for new approval requests...\n")
 
         try:
-            async for envelope in self.bus.subscribe_simple(["human-gates"]):
+            async for envelope in self.bus.subscribe_simple(["user-gates"]):
                 if envelope.id not in self._handled_gate_ids:
                     await self._handle_gate(envelope)
         except asyncio.CancelledError:
@@ -53,7 +53,7 @@ class HumanApprovalConsole:
         try:
             gate_messages = []
             try:
-                raw = await r.xrange("stream:human-gates")
+                raw = await r.xrange("stream:user-gates")
                 for msg_id, data in raw:
                     try:
                         env = Envelope.from_json(data["data"])
@@ -62,7 +62,7 @@ class HumanApprovalConsole:
                         logger.warning("gate message parse failed for msg %s", msg_id, exc_info=True)
                         continue
             except Exception:
-                logger.warning("approval stream read failed for stream:human-gates", exc_info=True)
+                logger.warning("approval stream read failed for stream:user-gates", exc_info=True)
                 return
 
             if not gate_messages:
@@ -167,8 +167,8 @@ class HumanApprovalConsole:
     async def _respond(self, gate_env: Envelope, action: str) -> None:
         """Publish the approval response to both the per-gate channel and system stream."""
         response = Envelope(
-            sender_id="human",
-            sender_role="human",
+            sender_id="user",
+            sender_role="user",
             message_type=MessageType.SYSTEM,
             payload={"action": action, "gate_id": gate_env.id},
             thread_id=gate_env.thread_id,

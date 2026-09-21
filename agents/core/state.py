@@ -18,7 +18,7 @@ from agents.core.metrics import METRICS_KEY
 
 ALL_STREAMS = [
     "system", "proposals", "reviews", "tasks",
-    "review-requests", "review-results", "progress", "human-gates",
+    "review-requests", "review-results", "progress", "user-gates",
 ]
 
 

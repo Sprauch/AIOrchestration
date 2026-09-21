@@ -14,7 +14,7 @@ Do not optimize for code quality in isolation.
 
 ## Current Priorities
 
-1. **Trust and legibility** — make it obvious what the system is doing, why it is blocked, what changed after challenge/review, and when human action is needed
+1. **Trust and legibility** — make it obvious what the system is doing, why it is blocked, what changed after challenge/review, and when user action is needed
 2. **User experience** — reduce setup friction, confusing states, dead ends, noisy logs, and unclear approval/review flows
 3. **Workflow reliability** — fix failures that cause users to lose work, see inconsistent state, or have to manually recover the system
 4. **Spend transparency** — make cost, token usage, and inefficient behavior easier for users to understand and control
@@ -32,6 +32,6 @@ Do not optimize for code quality in isolation.
 - Keep changes incremental — no sweeping refactors
 - Every change must have tests
 - Run project code and tests through the repo virtualenv, using direct binaries like `agents/.venv/bin/pytest tests` instead of relying on a globally installed `python` or `pytest`
-- Protected files (agents/config.yaml) require human approval
+- Protected files (agents/config.yaml) require user approval
 - Branch prefix must be agent/*
 - Changes to prompts, config, and orchestrator core are allowed when they clearly improve product behavior, trust, or dogfooding experience, but keep them narrowly scoped and easy to review

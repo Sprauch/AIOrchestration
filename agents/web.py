@@ -25,7 +25,7 @@ from agents.core.message_bus import MessageBus
 from agents.core.mode import MODES, get_mode, set_mode
 from agents.core import refusals
 from agents.core.redis_keys import _active_keys, _clear_active_work_thread
-from agents.core.state import derive_current_phase, load_snapshot
+from agents.core.state import ROLE_TO_PHASE, derive_current_phase, load_snapshot
 from agents.core.supervisor import (
     SupervisorError,
     clear_start_failure,
@@ -41,7 +41,7 @@ STATIC_DIR = Path(__file__).parent / "static"
 
 ALL_CHANNELS = [
     "proposals", "design-feedback", "reviews", "tasks", "review-requests",
-    "review-results", "progress", "human-gates", "system",
+    "review-results", "progress", "user-gates", "system",
 ]
 
 
@@ -84,6 +84,7 @@ class WebDashboard:
         app.router.add_get("/api/agents/{agent_id}", self._handle_agent_detail)
         app.router.add_get("/api/streams/{stream_name}", self._handle_stream_messages)
         app.router.add_get("/api/policy", self._handle_policy)
+        app.router.add_get("/api/errors", self._handle_errors)
         app.router.add_get("/api/refused", self._handle_refused_list)
         app.router.add_post("/api/refused/{refusal_id}/reinstate", self._handle_refused_reinstate)
         app.router.add_post("/api/refused/{refusal_id}/restart", self._handle_refused_restart)
@@ -405,7 +406,24 @@ class WebDashboard:
         data["backpressure"] = bp
 
         # Pipeline phase indicator
-        data["pipeline_phase"] = derive_current_phase(snapshot.agents, bp)
+        phase = derive_current_phase(snapshot.agents, bp)
+
+        # WHICH ROLE IS WAITING ON YOU. A role holding an unanswered gate is not idle and
+        # it is not working — it is stopped, on purpose, pending a decision that only the
+        # operator can make. That is a different state from "active" and the header draws
+        # it differently: bold for working, underlined for waiting on you.
+        try:
+            waiting = {
+                ROLE_TO_PHASE.get(g.get("role"), g.get("role"))
+                for g in await self._get_gates_data()
+                if g.get("pending")
+            }
+        except Exception:
+            waiting = set()
+        for entry in phase.get("phases", []):
+            entry["awaiting"] = entry["name"] in waiting
+
+        data["pipeline_phase"] = phase
 
         return web.json_response(data, dumps=lambda x: json.dumps(x, default=str))
 
@@ -543,7 +561,7 @@ class WebDashboard:
 
         gates: list[dict] = []
         try:
-            for _mid, data in await r.xrange("stream:human-gates", count=1000):
+            for _mid, data in await r.xrange("stream:user-gates", count=1000):
                 try:
                     env = Envelope.from_json(data["data"])
                     res = resolutions.get(env.id)
@@ -767,31 +785,31 @@ class WebDashboard:
             if status == "blocked" and t["review_cycles"] >= self._max_change_rounds:
                 t["why"] = f"Blocked after {t['review_cycles']} review cycles"
                 t["blocked_reason"] = bi[0] if bi else "Review cycle limit reached"
-                t["needs_human"] = True
+                t["needs_user"] = True
             # Not cut to 200 here. The API truncating is what made the detail view
             # unreadable; a list shortens in CSS, where it knows how much room it has.
             elif status == "rework" and bi:
                 t["why"] = "Changes requested: " + bi[0]
                 t["blocked_reason"] = bi[0] if bi else ""
-                t["needs_human"] = False
+                t["needs_user"] = False
             elif status == "rework" and t.get("concerns"):
                 t["why"] = "Needs revision: " + t["concerns"][0]
                 t["blocked_reason"] = t["concerns"][0] if t["concerns"] else ""
-                t["needs_human"] = False
+                t["needs_user"] = False
             elif status == "failed":
                 t["why"] = "Rejected by architect"
                 t["blocked_reason"] = ""
-                t["needs_human"] = False
+                t["needs_user"] = False
             elif t["pr"] and t["pr"].get("status") == "failed":
                 t["why"] = "PR creation failed"
                 t["blocked_reason"] = t["pr"].get("detail", "")
-                t["needs_human"] = True
+                t["needs_user"] = True
             else:
                 t["why"] = ""
                 t["blocked_reason"] = ""
-                t["needs_human"] = False
+                t["needs_user"] = False
 
-            # Current state — human readable
+            # Current state — user readable
             state_map = {
                 "analyzing": "Being analyzed by PM",
                 "proposed": "Proposal submitted, awaiting technical review",
@@ -878,7 +896,7 @@ class WebDashboard:
                     # which were volunteered.
                     "summary": (
                         "Manually submitted proposal"
-                        if t.get("last_sender_role") == "person"
+                        if t.get("last_sender_role") == "user"
                         else "PM submitted a proposal"
                     ),
                     "detail": "Architect review is next.",
@@ -1254,6 +1272,43 @@ class WebDashboard:
 
 
 
+
+    async def _handle_errors(self, request: web.Request) -> web.Response:
+        """Agent failures with their actual messages, newest first.
+
+        The dashboard could previously only report counters — "errors:architect: 17" — which
+        names a number and not a problem. Agents publish agent_error events carrying the
+        exception type, its message and what they were handling at the time; this reads
+        them back so the interface can say what went wrong.
+        """
+        out = []
+        try:
+            entries = await self.bus.redis.xrevrange("stream:system", count=self._stream_read_limit)
+        except Exception:
+            entries = []
+
+        for _mid, fields in entries or []:
+            try:
+                env = json.loads(fields.get("data") or "{}")
+            except (json.JSONDecodeError, AttributeError):
+                continue
+            payload = env.get("payload") or {}
+            if payload.get("action") != "agent_error":
+                continue
+            ts = env.get("timestamp", "")
+            out.append({
+                "agent_id": payload.get("agent_id", ""),
+                "role": payload.get("role", ""),
+                "error_type": payload.get("error_type", "Error"),
+                "error": payload.get("error", ""),
+                "message_type": payload.get("message_type", ""),
+                "thread_id": env.get("thread_id", ""),
+                "time": ts[11:19] if len(ts) > 19 else ts,
+                "timestamp": ts,
+            })
+
+        return web.json_response({"errors": out})
+
     # ── Refused work, and the two ways back ────────────────
 
     async def _handle_refused_list(self, request: web.Request) -> web.Response:
@@ -1285,8 +1340,8 @@ class WebDashboard:
             )
 
         env = Envelope(
-            sender_id="person",
-            sender_role="person",
+            sender_id="user",
+            sender_role="user",
             message_type=MessageType(entry["message_type"]),
             payload=entry.get("payload", {}),
             thread_id=entry.get("thread_id") or "",
@@ -1327,8 +1382,8 @@ class WebDashboard:
 
         # A NEW thread: this is a fresh attempt, not a continuation of the refused one.
         env = Envelope(
-            sender_id="person",
-            sender_role="person",
+            sender_id="user",
+            sender_role="user",
             message_type=MessageType.PROPOSAL,
             payload=proposal,
             recipient_role=(
@@ -1410,7 +1465,7 @@ class WebDashboard:
         if s is None:
             return web.json_response({"available": False})
 
-        required = list(getattr(s, "human_approval_required", []) or [])
+        required = list(getattr(s, "user_approval_required", []) or [])
         gates = []
         for action in required:
             when, why = self._GATE_DESCRIPTIONS.get(
@@ -1441,7 +1496,7 @@ class WebDashboard:
     # ── Orchestration mode ─────────────────────────────────
 
     # Which mode is in force decides only ONE thing: whether the PM agent proposes work.
-    # A human proposal is an ordinary proposal envelope and routes by target_area exactly
+    # A user proposal is an ordinary proposal envelope and routes by target_area exactly
     # as the PM's would, so nothing downstream is mode-aware.
 
     async def _handle_mode_get(self, request: web.Request) -> web.Response:
@@ -1473,7 +1528,7 @@ class WebDashboard:
         if mode == "automatic":
             try:
                 await self.bus.publish("system", Envelope(
-                    sender_id="dashboard", sender_role="person",
+                    sender_id="dashboard", sender_role="user",
                     message_type=MessageType.SYSTEM,
                     payload={"action": "analyze_codebase",
                              "reason": "switched to automatic mode"},
@@ -1492,7 +1547,7 @@ class WebDashboard:
     }
 
     async def _handle_submit_proposal(self, request: web.Request) -> web.Response:
-        """Publish a proposal written by a person, as the PM would have.
+        """Publish a proposal written by a user, as the PM would have.
 
         Same envelope, same routing rule, same stream. The architect has never cared how
         a proposal arrived, which is why manual mode needs no changes downstream.
@@ -1509,7 +1564,7 @@ class WebDashboard:
 
         # NOTHING IS MANDATORY except that the proposal is not empty. The architect has
         # the codebase in front of it and can infer a great deal; where it cannot, asking
-        # is a better use of its context than a form refusing to submit. The human is the
+        # is a better use of its context than a form refusing to submit. The user is the
         # quality gate either way, so a thin proposal costs a question, not a defect.
         title = str(body.get("title", "")).strip()
         user_problem = str(body.get("user_problem", "")).strip()
@@ -1540,7 +1595,7 @@ class WebDashboard:
 
         recipient = "product_designer" if target_area in self.USER_FACING_TARGETS else "architect"
         kwargs = dict(
-            sender_id="person", sender_role="person",
+            sender_id="user", sender_role="user",
             message_type=MessageType.PROPOSAL,
             payload=payload, recipient_role=recipient,
         )
@@ -1551,7 +1606,7 @@ class WebDashboard:
         env = Envelope(**kwargs)
         await self.bus.publish("proposals", env)
         logger.info(
-            "Human proposal published to %s (thread %s): %s",
+            "User proposal published to %s (thread %s): %s",
             recipient, env.thread_id[:8], title,
         )
         return web.json_response({
@@ -1630,7 +1685,7 @@ class WebDashboard:
         thread_id = ""
         found = False
         try:
-            for _mid, data in await r.xrange("stream:human-gates"):
+            for _mid, data in await r.xrange("stream:user-gates"):
                 env = Envelope.from_json(data["data"])
                 if env.id == gate_id:
                     thread_id = env.thread_id
@@ -1642,7 +1697,7 @@ class WebDashboard:
         if not found:
             return web.json_response({"error": "gate not found"}, status=404)
 
-        response_env = Envelope(sender_id="human", sender_role="human", message_type=MessageType.SYSTEM, payload={"action": action, "gate_id": gate_id}, thread_id=thread_id)
+        response_env = Envelope(sender_id="user", sender_role="user", message_type=MessageType.SYSTEM, payload={"action": action, "gate_id": gate_id}, thread_id=thread_id)
         await self.bus.publish(f"gate-responses:{gate_id}", response_env)
         await self.bus.publish("system", response_env)
         return web.json_response({"status": "ok", "action": action, "gate_id": gate_id})

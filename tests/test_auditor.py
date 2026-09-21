@@ -112,8 +112,8 @@ async def test_exhausted_cycles_empty():
 @pytest.mark.asyncio
 async def test_pending_gate_found():
     r = FakeRedis()
-    gate = _env(MessageType.HUMAN_GATE, {"action": "create_pr"})
-    r.add_stream_message("stream:human-gates", gate)
+    gate = _env(MessageType.USER_GATE, {"action": "create_pr"})
+    r.add_stream_message("stream:user-gates", gate)
     # No response in system stream
     findings: list[Finding] = []
     await _check_pending_gates(r, findings)
@@ -125,8 +125,8 @@ async def test_pending_gate_found():
 @pytest.mark.asyncio
 async def test_gate_already_responded():
     r = FakeRedis()
-    gate = _env(MessageType.HUMAN_GATE, {"action": "create_pr"})
-    r.add_stream_message("stream:human-gates", gate)
+    gate = _env(MessageType.USER_GATE, {"action": "create_pr"})
+    r.add_stream_message("stream:user-gates", gate)
     # Response exists on the per-gate response channel
     response = _env(MessageType.SYSTEM, {"action": "approval_granted", "gate_id": gate.id})
     r.add_stream_message(f"stream:gate-responses:{gate.id}", response)

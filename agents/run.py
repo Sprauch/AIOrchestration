@@ -4,7 +4,7 @@ Commands:
     agent-orchestrator run [--agent ROLE] [--id ID]   Start the orchestrator service
     agent-orchestrator once                           Single improvement cycle, then exit
     agent-orchestrator monitor                        Real-time TUI dashboard
-    agent-orchestrator approve                        Interactive human approval console
+    agent-orchestrator approve                        Interactive user approval console
     agent-orchestrator preflight                      Validate environment and config
     agent-orchestrator status                         One-time status dashboard
 """
@@ -150,11 +150,11 @@ def cmd_web(args: argparse.Namespace) -> None:
 
 
 def cmd_approve(args: argparse.Namespace) -> None:
-    """Launch the interactive human approval console."""
+    """Launch the interactive user approval console."""
     setup_logging(False)
     redis_url = OrchestratorConfig.from_yaml(args.config).system.redis_url
-    from agents.approval_console import HumanApprovalConsole
-    console = HumanApprovalConsole(redis_url)
+    from agents.approval_console import UserApprovalConsole
+    console = UserApprovalConsole(redis_url)
     asyncio.run(console.run())
 
 
@@ -201,7 +201,7 @@ def cmd_dogfood(args: argparse.Namespace) -> None:
         "\n  Dogfood Mode\n"
         "  ────────────\n"
         "  The orchestrator will analyze and propose changes to its own codebase.\n"
-        "  Protected files will require human approval (not silently blocked).\n\n"
+        "  Protected files will require user approval (not silently blocked).\n\n"
         "  Other terminals you may want:\n"
         f"    agent-orchestrator web --config {args.config}       # web dashboard\n"
         f"    agent-orchestrator monitor --config {args.config}   # TUI dashboard\n"
@@ -315,7 +315,7 @@ def _render_status_text(snapshot) -> None:
 # ── Parser ─────────────────────────────────────────────────
 
 def cmd_propose(args) -> None:
-    """Publish a human-written proposal, from a file or a register/backlog reference."""
+    """Publish a user-written proposal, from a file or a register/backlog reference."""
     import asyncio
 
     from agents.core.config import OrchestratorConfig
@@ -347,7 +347,7 @@ def cmd_propose(args) -> None:
         await bus.connect()
         try:
             kwargs = dict(
-                sender_id="person", sender_role="person",
+                sender_id="user", sender_role="user",
                 message_type=MessageType.PROPOSAL,
                 payload=payload, recipient_role=recipient,
             )
@@ -415,7 +415,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_web.set_defaults(func=cmd_web)
 
     # -- approve --
-    p_app = subparsers.add_parser("approve", help="Interactive human approval console")
+    p_app = subparsers.add_parser("approve", help="Interactive user approval console")
     p_app.add_argument("--config", default="agents/config.yaml", help="Config file path")
     p_app.set_defaults(func=cmd_approve)
 

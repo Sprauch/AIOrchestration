@@ -10,6 +10,7 @@ from typing import AsyncIterator
 
 import redis.asyncio as aioredis
 from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from agents.core.message import Envelope
 
@@ -21,7 +22,19 @@ _BACKOFF_CAP = 30.0  # max delay in seconds
 _DEFAULT_MAX_RETRIES = 5
 
 # Exception types considered transient (connection-level).
-_TRANSIENT_ERRORS = (RedisConnectionError, ConnectionError, TimeoutError, OSError)
+# redis.exceptions.TimeoutError is NOT a subclass of the builtin TimeoutError — it
+# derives from RedisError — so listing only the builtin silently excluded the one
+# timeout this layer actually raises. A read that timed out was therefore treated as
+# a permanent fault and re-raised, which killed the message being handled rather than
+# retrying. That is how an approved gate lost its task.
+_TRANSIENT_ERRORS = (
+    RedisConnectionError, RedisTimeoutError, ConnectionError, TimeoutError, OSError,
+)
+
+# No single XREAD may block longer than this, however long the caller is willing to
+# wait overall. The connection has its own read timeout and does not care what the
+# gate's deadline is.
+_MAX_BLOCK_MS = 15_000
 
 
 def _is_transient(exc: BaseException) -> bool:
@@ -347,15 +360,27 @@ class MessageBus:
             remaining_s = deadline - time.monotonic()
             if remaining_s <= 0:
                 return None
-            remaining_ms = max(int(remaining_s * 1000), 1)
+            # ASK REDIS FOR A SHORT SLICE, NOT THE WHOLE WAIT.
+            #
+            # This passed the full remaining time as the BLOCK argument. Survivable while a
+            # gate waited five minutes; fatal once it waited a week. XREAD BLOCK 604800000
+            # outlives the client's own socket timeout, so the read raised TimeoutError
+            # about five seconds in, the exception escaped _handle_message, and THE GATED
+            # MESSAGE WAS LOST — the operator approved a gate whose agent had already
+            # crashed, and the task never reached the stream.
+            #
+            # Slicing keeps the long deadline, which belongs to the user, while never
+            # asking the connection to hold a read open longer than it tolerates.
+            block_ms = max(min(int(remaining_s * 1000), _MAX_BLOCK_MS), 1)
 
             try:
                 await self._ensure_connected()
                 results = await self.redis.xread(
-                    {stream_key: last_id}, block=remaining_ms, count=1,
+                    {stream_key: last_id}, block=block_ms, count=1,
                 )
                 if not results:
-                    return None
+                    # A SLICE expired, not the wait. Only the deadline ends this.
+                    continue
 
                 for _stream, messages in results:
                     for _msg_id, data in messages:

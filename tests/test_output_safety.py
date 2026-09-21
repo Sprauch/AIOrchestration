@@ -6,7 +6,7 @@ import pytest
 
 from agents.core.message import Envelope, MessageType
 from agents.core.safety import SafetyChecker, SafetyConfig, build_gate_context
-from agents.approval_console import HumanApprovalConsole
+from agents.approval_console import UserApprovalConsole
 from agents.roles.developer_agent import DeveloperAgent
 
 
@@ -79,7 +79,7 @@ def _make_safety():
         protected_files=[".env", "vercel.json"],
         branch_prefix="agent/",
         never_push_to=["main", "master"],
-        human_approval_required=["large_change"],
+        user_approval_required=["large_change"],
         max_files_per_change=3,
     ))
 
@@ -155,7 +155,7 @@ async def test_output_passes_without_safety():
 
 @pytest.mark.asyncio
 async def test_output_large_change_emits_gate_and_blocks_on_timeout():
-    """Large changes emit a HUMAN_GATE and block via XREAD.
+    """Large changes emit a USER_GATE and block via XREAD.
     With no response, wait_for_message returns None (timeout).
     """
     agent = _make_agent(safety=_make_safety())
@@ -172,7 +172,7 @@ async def test_output_large_change_emits_gate_and_blocks_on_timeout():
     # Verify the gate was published
     gates = [
         (ch, e) for ch, e in agent.bus.published
-        if e.message_type == MessageType.HUMAN_GATE
+        if e.message_type == MessageType.USER_GATE
     ]
     assert len(gates) == 1
     assert gates[0][1].payload["action"] == "large_change"
@@ -192,7 +192,7 @@ async def test_output_large_change_approved():
 
     # Pre-load an approval response for any gate channel
     bus.preload_gate_response("gate-responses:", Envelope(
-        sender_id="human", sender_role="human",
+        sender_id="user", sender_role="user",
         message_type=MessageType.SYSTEM,
         payload={"action": "approval_granted"},
     ))
@@ -219,7 +219,7 @@ async def test_output_large_change_denied():
     )
 
     bus.preload_gate_response("gate-responses:", Envelope(
-        sender_id="human", sender_role="human",
+        sender_id="user", sender_role="user",
         message_type=MessageType.SYSTEM,
         payload={"action": "approval_denied"},
     ))
@@ -263,8 +263,8 @@ def test_build_gate_context_with_files():
 def test_build_gate_context_shows_every_file():
     """The gate context lists EVERY file, however many there are.
 
-    It used to stop at 20. A gate exists so a person can decide whether to allow a
-    change, and hiding the 21st file from that person defeats the only purpose the
+    It used to stop at 20. A gate exists so a user can decide whether to allow a
+    change, and hiding the 21st file from that user defeats the only purpose the
     context has — the more files a change touches, the more that decision depends on
     seeing all of them.
     """
@@ -312,7 +312,7 @@ async def test_large_change_gate_has_structured_context():
 
     gates = [
         (ch, e) for ch, e in agent.bus.published
-        if e.message_type == MessageType.HUMAN_GATE
+        if e.message_type == MessageType.USER_GATE
     ]
     assert len(gates) == 1
     context = gates[0][1].payload["context"]
@@ -340,7 +340,7 @@ async def test_large_change_gate_files_are_classified():
 
     gates = [
         (ch, e) for ch, e in agent.bus.published
-        if e.message_type == MessageType.HUMAN_GATE
+        if e.message_type == MessageType.USER_GATE
     ]
     context = gates[0][1].payload["context"]
     for f_entry in context["files"]:
@@ -362,7 +362,7 @@ def test_format_context_with_structured_dict():
         safety_summary="escalated",
         escalation_reason="2 files",
     )
-    result = HumanApprovalConsole._format_context(ctx)
+    result = UserApprovalConsole._format_context(ctx)
     assert "large_change" in result
     assert "agent/fix" in result
     assert "a.py" in result
@@ -372,23 +372,23 @@ def test_format_context_with_structured_dict():
 
 def test_format_context_with_legacy_string():
     """approval_console handles legacy plain-string context."""
-    result = HumanApprovalConsole._format_context("file1.py, file2.py")
+    result = UserApprovalConsole._format_context("file1.py, file2.py")
     assert result == "file1.py, file2.py"
 
 
 def test_format_context_with_none():
     """approval_console handles None context gracefully."""
-    assert HumanApprovalConsole._format_context(None) == ""
+    assert UserApprovalConsole._format_context(None) == ""
 
 
 def test_format_context_with_empty_string():
     """approval_console handles empty string context gracefully."""
-    assert HumanApprovalConsole._format_context("") == ""
+    assert UserApprovalConsole._format_context("") == ""
 
 
 def test_format_context_with_empty_dict():
     """approval_console handles empty dict context gracefully."""
-    result = HumanApprovalConsole._format_context({})
+    result = UserApprovalConsole._format_context({})
     assert result == ""
 
 
@@ -421,10 +421,10 @@ async def test_gate_timeout_emits_system_event():
     assert "gate_id" in evt.payload
     assert evt.payload["agent"] == "dev-1"
     assert "resolution_at" in evt.payload
-    # gate_id should match the HUMAN_GATE that was emitted
+    # gate_id should match the USER_GATE that was emitted
     gates = [
         e for _, e in agent.bus.published
-        if e.message_type == MessageType.HUMAN_GATE
+        if e.message_type == MessageType.USER_GATE
     ]
     assert len(gates) == 1
     assert evt.payload["gate_id"] == gates[0].id
@@ -437,7 +437,7 @@ def _gating_safety(actions):
     return SafetyChecker(SafetyConfig(
         branch_prefix="agent/",
         never_push_to=["main", "master"],
-        human_approval_required=actions,
+        user_approval_required=actions,
         max_files_per_change=50,
     ))
 
@@ -461,7 +461,7 @@ def _task_assignment():
 async def test_task_assignment_is_gated_when_configured():
     """A denied assignment dispatches no work at all.
 
-    Gating only create_pr meant the first human decision came AFTER a developer had
+    Gating only create_pr meant the first user decision came AFTER a developer had
     worked a full cycle in a worktree and a reviewer had read the result. If the premise
     was wrong, the tokens were already spent. This gate is the point where saying no is
     still free.
@@ -473,7 +473,7 @@ async def test_task_assignment_is_gated_when_configured():
         asked.update(action=action, reason=reason, context=context)
         return False
 
-    agent._request_human_approval = deny
+    agent._request_user_approval = deny
     assert await agent._check_output_safety(_task_assignment()) is False
     assert asked["action"] == "assign_task"
     # The reason is the approach's first line, not the whole thing
@@ -491,7 +491,7 @@ async def test_approved_task_assignment_proceeds():
     async def approve(action, reason, context, thread_id):
         return True
 
-    agent._request_human_approval = approve
+    agent._request_user_approval = approve
     assert await agent._check_output_safety(_task_assignment()) is True
 
 
@@ -506,6 +506,6 @@ async def test_task_assignment_not_gated_when_not_configured():
         called = True
         return False
 
-    agent._request_human_approval = should_not_run
+    agent._request_user_approval = should_not_run
     assert await agent._check_output_safety(_task_assignment()) is True
     assert called is False

@@ -29,7 +29,7 @@ from copy import deepcopy
 # was being dropped before it reached the CLI; fixing that made all of them real at once.
 #
 # THE TRADE, and it is not close. A complete message costs a few hundred tokens once. An
-# incomplete one costs a reader - human or agent - guessing at the missing context while
+# incomplete one costs a reader - user or agent - guessing at the missing context while
 # doing the work, and usually another round to recover what was cut. Letting prose run as
 # long as the context requires is the cheap option; the expensive option is paying later
 # for what was removed here.
@@ -48,7 +48,7 @@ def _str(max_len: int) -> dict:
 
 
 def _text() -> dict:
-    """Unbounded text. The default for anything a person reads."""
+    """Unbounded text. The default for anything a user reads."""
     return {"type": "string"}
 
 

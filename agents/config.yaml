@@ -16,7 +16,7 @@ system:
     things worth doing are already written down there with reasoning attached.
     Prefer proposals that are small, verifiable, and behaviour-preserving. Changes to
     generated data, dependencies, the deploy path or the service worker need explicit
-    human approval and should not be proposed as routine work.
+    user approval and should not be proposed as routine work.
   max_concurrent_tasks: 2
   once_timeout: 1800
   max_restarts: 3
@@ -25,10 +25,10 @@ system:
   cascade_poll_interval: 2
   restart_delay: 5
   # ONE WEEK. The shipped value was 300 - five minutes - which is a machine's idea of a
-  # timeout rather than a person's; it then spent time at 24 hours, which is still an
+  # timeout rather than a user's; it then spent time at 24 hours, which is still an
   # assumption that the operator looks at this every day.
   #
-  # A gate is a question put to a person, and the honest bound is how long that person
+  # A gate is a question put to a user, and the honest bound is how long that user
   # might reasonably be away: a weekend, a trip, a week of doing something else. Expiry
   # REFUSES the action rather than allowing it, so a long timeout costs nothing but a
   # thread sitting still, while a short one silently converts "not asked yet" into "no".
@@ -199,7 +199,7 @@ safety:
     # produced. A rule meant to prevent an action prevented a conversation.
     #
     # Execution is controlled where execution happens: allowed_tools per agent, and
-    # human_approval_required below. The patterns that remain are the ones where the
+    # user_approval_required below. The patterns that remain are the ones where the
     # text appearing in a prompt is itself the warning sign.
   protected_files:
     - ".env"
@@ -210,7 +210,7 @@ safety:
     - "CLAUDE.md"
     - ".claude/rules/"
     - ".claude/settings.json"
-    # Dependencies and build configuration: changing these is gated on a human in this
+    # Dependencies and build configuration: changing these is gated on a user in this
     # project, and B63 is an open entry about a second lockfile already causing trouble.
     - "package.json"
     - "package-lock.json"
@@ -228,24 +228,24 @@ safety:
     - "scripts/mtg/vendor-refresh.js"
   branch_prefix: "agent/"
   never_push_to: ["main", "master"]
-  # Actions that require human approval via `agent-orchestrator approve`.
+  # Actions that require user approval via `agent-orchestrator approve`.
   # If the approval console is not running, gated actions will time out
   # and be blocked after gate_timeout seconds.
   # Remove items from this list to run fully autonomously.
-  human_approval_required:
+  user_approval_required:
     # THE EXPENSIVE DECISION IS "START THIS", NOT "SHIP THIS".
     #
     # With only create_pr gated, a task ran the whole cycle - developer works a worktree,
-    # reviewer reads the diff - and the first human decision came after all of it was
+    # reviewer reads the diff - and the first user decision came after all of it was
     # paid for. If the premise was wrong, the tokens were already gone. The architect
     # rejects proposals on their premise often enough that this is a real cost, not a
     # hypothetical one.
     #
     # assign_task blocks at the point where refusing is still free.
-    - assign_task            # Nothing is built until a human says so
+    - assign_task            # Nothing is built until a user says so
     - delete_files
     - modify_database
-    - create_pr              # Human reviews before PR is created
+    - create_pr              # User reviews before PR is created
     # - push_to_remote       # Uncomment to gate branch pushes
     # - large_change         # Uncomment to gate changes exceeding max_files_per_change
   max_files_per_change: 10

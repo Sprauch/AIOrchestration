@@ -87,13 +87,13 @@ async def _check_exhausted_cycles(r: aioredis.Redis, findings: list[Finding]) ->
 
 
 async def _check_pending_gates(r: aioredis.Redis, findings: list[Finding]) -> None:
-    """Fact: human gates awaiting response block agent progress.
+    """Fact: user gates awaiting response block agent progress.
 
     Checks each gate's dedicated response channel (gate-responses:{gate_id})
     instead of scanning a windowed system stream — exact, not approximate.
     """
     try:
-        gates = await r.xrange("stream:human-gates")
+        gates = await r.xrange("stream:user-gates")
     except Exception:
         return
 
@@ -112,7 +112,7 @@ async def _check_pending_gates(r: aioredis.Redis, findings: list[Finding]) -> No
     if pending:
         findings.append(Finding(
             "warning", "fact", "gate",
-            f"{pending} human gate(s) awaiting response",
+            f"{pending} user gate(s) awaiting response",
             "Approve or deny in the Exceptions tab.",
         ))
 

@@ -8,7 +8,7 @@ a phone.
 WHAT IT DELIBERATELY DOES NOT DO. It does not run agents in the web server's own process.
 The orchestrator is long-lived, manages child CLI sessions and traps signals; hosting it
 inside an aiohttp request would tie its lifetime to a browser tab and make a dashboard
-restart kill the work. It spawns a detached child instead, exactly as a person typing
+restart kill the work. It spawns a detached child instead, exactly as a user typing
 the command would, so the orchestrator outlives the dashboard and is stopped on purpose
 rather than by accident.
 
@@ -201,7 +201,7 @@ def clear_start_failure() -> None:
 
 
 def _log_tail(path: Path, lines: int = 12) -> str:
-    """The last few lines of the spawn log, for an error message a person can act on."""
+    """The last few lines of the spawn log, for an error message a user can act on."""
     try:
         text = path.read_text(encoding="utf-8", errors="replace").strip().splitlines()
     except OSError:

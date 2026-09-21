@@ -1107,3 +1107,59 @@ async def test_wait_for_message_reconnect_non_transient_propagates(mock_redis):
         ):
             with pytest.raises(aioredis.ResponseError, match="AUTH required"):
                 await bus.wait_for_message("gate", timeout_ms=10000)
+
+
+# ── Long waits must survive the connection's own read timeout ────────────
+
+
+def test_redis_timeout_is_treated_as_transient():
+    """redis.exceptions.TimeoutError is not a builtin TimeoutError.
+
+    It derives from RedisError, so a transient set listing only the builtin excluded the
+    one timeout this layer actually raises. A timed-out read was then treated as a
+    permanent fault and re-raised, which killed the message being handled instead of
+    retrying — that is how an approved gate lost the task it had been holding.
+    """
+    from redis.exceptions import TimeoutError as RedisTimeoutError
+
+    from agents.core.message_bus import _is_transient
+
+    assert _is_transient(RedisTimeoutError("Timeout reading from localhost:6379"))
+    assert not isinstance(RedisTimeoutError("x"), TimeoutError)
+
+
+@pytest.mark.asyncio
+async def test_wait_for_message_slices_a_long_block():
+    """A week-long wait must not become a week-long XREAD.
+
+    The gate timeout belongs to the user; the connection has its own read timeout and
+    does not care. Asking Redis to block for the whole week raised TimeoutError about five
+    seconds in. Each read is now capped, and an empty read CONTINUES the wait rather than
+    ending it — the deadline is the only thing that ends it.
+    """
+    from agents.core.message_bus import _MAX_BLOCK_MS, MessageBus
+    from agents.core.message import Envelope, MessageType
+
+    blocks = []
+    reply = Envelope(
+        sender_id="user", sender_role="user",
+        message_type=MessageType.SYSTEM,
+        payload={"action": "approval_granted"},
+    )
+
+    class FakeRedis:
+        async def xread(self, streams, block=None, count=None):
+            blocks.append(block)
+            if len(blocks) < 3:
+                return []  # this slice expired; the wait must go on
+            return [("stream:gate-responses:abc", [("1-1", {"data": reply.to_json()})])]
+
+    bus = MessageBus("redis://unused")
+    bus.redis = FakeRedis()
+
+    got = await bus.wait_for_message("gate-responses:abc", timeout_ms=604_800_000)
+
+    assert got is not None                     # the answer arrived after empty slices
+    assert got.payload["action"] == "approval_granted"
+    assert len(blocks) == 3                    # two empty reads did not end the wait
+    assert max(blocks) <= _MAX_BLOCK_MS        # never asked for more than a slice
