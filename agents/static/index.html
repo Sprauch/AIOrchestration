@@ -279,6 +279,7 @@
       <p class="view-desc">Agent health, telemetry, and infrastructure state.</p>
       <div class="sub-tabs">
         <button class="sub-tab active" data-sub="sys-agents">Agents</button>
+        <button class="sub-tab" data-sub="sys-usage">Usage</button>
         <button class="sub-tab" data-sub="sys-telemetry">Telemetry</button>
         <button class="sub-tab" data-sub="sys-redis">Advanced</button>
       </div>
@@ -304,6 +305,13 @@
         <div class="pipeline-canvas" id="pipeline-canvas-sys">
           <svg class="connections" id="pipeline-svg-sys"></svg>
         </div>
+      </div>
+
+      <!-- Between Agents and Telemetry: what things cost, sliced so an anomaly is a
+           comparison rather than a number to interpret. -->
+      <div class="sub-view" id="sys-usage">
+        <p class="view-desc">Tokens and API-rate cost per agent, per proposal, and over time.</p>
+        <div id="sys-usage-body"><div class="empty loading-pulse">Loading usage...</div></div>
       </div>
 
       <!-- Telemetry sub-view -->

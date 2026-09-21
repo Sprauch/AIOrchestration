@@ -147,6 +147,7 @@ document.querySelectorAll('.sub-tab').forEach(t=>t.addEventListener('click',func
   document.getElementById(this.dataset.sub).classList.add('active');
   if(this.dataset.sub==='sys-agents'&&lastSnap) setTimeout(()=>renderPipelineFull(lastSnap.agents,lastSnap.challengers||{},lastSnap.backpressure),50);
   if(this.dataset.sub==='sys-redis') refreshRedisInspector();
+  if(this.dataset.sub==='sys-usage'&&typeof renderUsage==='function') renderUsage();
 }));
 
 function closePanel(id){document.getElementById(id).classList.remove('open')}
@@ -1145,6 +1146,73 @@ async function gateAction(id,action){const h={method:'POST'};const hdrs=authHead
 // ── Orchestrator control ──
 // Follows the same token pattern as gateAction: stored in localStorage, prompted for on
 // 401, retried once. That means pairing a phone once works for approvals AND for this.
+// ── Usage ──
+// Spend is only legible when it can be sliced. A total says "expensive" and nothing more;
+// an anomaly is always a comparison — this agent against the others, this proposal against
+// the last, this hour against the rest of the day. Each table below is one of those
+// comparisons, so spotting a problem never means leaving for external tooling.
+function usdFmt(v){
+  if(!v)return '$0';
+  if(v>=1)return '$'+v.toFixed(2);
+  if(v>=0.01)return '$'+v.toFixed(3);
+  return '$'+v.toFixed(4);
+}
+
+function usageTable(title, note, rows, keyLabel, opts){
+  const o=opts||{};
+  if(!rows||!rows.length){
+    return '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>'+esc(title)+'</h3></div>'
+      +'<div class="card-body"><div class="empty">Nothing recorded yet.</div></div></div>';
+  }
+  // The largest row is the yardstick: every bar is read against it, which is what makes
+  // an outlier visible rather than merely present.
+  const max=Math.max.apply(null, rows.map(r=>r.tokens))||1;
+  const body=rows.map(r=>{
+    const pct=Math.round((r.tokens/max)*100);
+    const label=o.short?esc(String(r.key).slice(0,8)):esc(r.key);
+    return '<tr>'
+      +'<td class="ut-key">'+label+'</td>'
+      +'<td class="ut-bar"><span style="width:'+pct+'%"></span></td>'
+      +'<td class="ut-num">'+fmtTok(r.tokens)+'</td>'
+      +'<td class="ut-num ut-dim">'+fmtTok(r.tokens_in)+' in</td>'
+      +'<td class="ut-num ut-dim">'+fmtTok(r.tokens_out)+' out</td>'
+      +'<td class="ut-num">'+usdFmt(r.cost_usd)+'</td>'
+      +'</tr>';
+  }).join('');
+  return '<div class="card" style="margin-bottom:16px">'
+    +'<div class="card-head"><h3>'+esc(title)+'</h3></div>'
+    +'<div class="card-body">'
+    +(note?'<p class="ut-note">'+esc(note)+'</p>':'')
+    +'<table class="ut"><thead><tr>'
+    +'<th>'+esc(keyLabel)+'</th><th></th><th>Tokens</th><th>In</th><th>Out</th><th>Cost</th>'
+    +'</tr></thead><tbody>'+body+'</tbody></table></div></div>';
+}
+
+async function renderUsage(){
+  const el=document.getElementById('sys-usage-body');
+  if(!el)return;
+  let d;
+  try{ d=await (await fetch('/api/usage')).json(); }
+  catch(e){ el.innerHTML='<div class="empty">Usage unavailable.</div>'; return; }
+
+  const t=d.total||{};
+  const head='<div class="ut-total">'
+    +'<div><span class="ut-total-num">'+fmtTok(t.tokens||0)+'</span><span class="ut-total-lbl">tokens all time</span></div>'
+    +'<div><span class="ut-total-num">'+usdFmt(t.cost_usd||0)+'</span><span class="ut-total-lbl">API-rate equivalent</span></div>'
+    +'<div><span class="ut-total-num">'+fmtTok(t.tokens_in||0)+'</span><span class="ut-total-lbl">read</span></div>'
+    +'<div><span class="ut-total-num">'+fmtTok(t.tokens_out||0)+'</span><span class="ut-total-lbl">written</span></div>'
+    +'</div>'
+    +'<p class="ut-note">Input dominates output by a wide margin in every run so far. The cost '
+    +'is what agents READ, so an agent reading more than its peers is the anomaly worth finding.</p>';
+
+  el.innerHTML=head
+    +usageTable('Per agent','Compare roles against each other. A cheap role spending like an expensive one is the signal.',d.by_role,'Agent')
+    +usageTable('Per proposal','One row per thread — the unit you actually approve. A proposal costing several times its neighbours was either much harder or went wrong.',d.by_thread,'Thread',{short:true})
+    +usageTable('Per hour','The last 48 hours. A spike here with no work to show for it is a loop.',d.by_hour,'Hour')
+    +usageTable('Per day','',d.by_day,'Day')
+    +usageTable('Per week','',d.by_week,'Week');
+}
+
 // ── Refused work ──
 // A refusal is not a deletion. Two ways back, and which one applies is a judgement about
 // whether the PROJECT moved — only a user can make it, so both are offered and neither

@@ -297,7 +297,7 @@ class AgentProcess(ABC):
         except Exception:
             return False
 
-    async def _record_token_usage(self, cli=None) -> None:
+    async def _record_token_usage(self, cli=None, thread_id: str | None = None) -> None:
         session = cli or self.cli
         usage = getattr(session, "last_usage", None)
         if not usage or not self._metrics:
@@ -308,21 +308,35 @@ class AgentProcess(ABC):
         # Per ISO week as well as per role. The plain totals answer "since when?" with
         # "since somebody last cleared Redis", which is useless as a budget reference;
         # a weekly bucket means the same thing every week and survives a flush.
-        year, week, _ = datetime.now(timezone.utc).isocalendar()
+        now = datetime.now(timezone.utc)
+        year, week, _ = now.isocalendar()
         wk = f"{year}-W{week:02d}"
+
+        # SPEND IS ONLY LEGIBLE WHEN IT CAN BE SLICED. A single total answers "is this
+        # expensive?" and nothing else. Anomalies show up as a comparison: this agent
+        # against the others, this proposal against the last one, this hour against the
+        # rest of the day. Each slice below exists to make one of those comparisons
+        # possible without leaving the dashboard for external tooling.
+        day = now.strftime("%Y-%m-%d")
+        hour = now.strftime("%Y-%m-%dT%H")
+        # Per THREAD, which is per proposal: the unit the operator actually approves.
+        thr = (thread_id or "").strip()
+
+        def add(metric: str, value: int) -> None:
+            increments[f"{metric}:{self.role}"] = value
+            increments[f"{metric}:total"] = value
+            increments[f"{metric}:week:{wk}"] = value
+            increments[f"{metric}:day:{day}"] = value
+            increments[f"{metric}:hour:{hour}"] = value
+            if thr:
+                increments[f"{metric}:thread:{thr}"] = value
+
         if inp:
-            increments[f"tokens_in:{self.role}"] = inp
-            increments["tokens_in:total"] = inp
-            increments[f"tokens_in:week:{wk}"] = inp
+            add("tokens_in", inp)
         if out:
-            increments[f"tokens_out:{self.role}"] = out
-            increments["tokens_out:total"] = out
-            increments[f"tokens_out:week:{wk}"] = out
+            add("tokens_out", out)
         if cost:
-            cost_mc = int(cost * 100_000)
-            increments[f"cost_mc:{self.role}"] = cost_mc
-            increments["cost_mc:total"] = cost_mc
-            increments[f"cost_mc:week:{wk}"] = cost_mc
+            add("cost_mc", int(cost * 100_000))
         await self._metrics.increment_many(increments)
         try:
             session.last_usage = None
@@ -495,7 +509,7 @@ class AgentProcess(ABC):
 
             # Capture usage before _record_token_usage clears it
             usage = getattr(self.cli, "last_usage", None) or {}
-            await self._record_token_usage()
+            await self._record_token_usage(thread_id=envelope.thread_id)
             await self._publish_trace("response", raw_response, envelope, extra={
                 "duration_ms": duration_ms,
                 "model": getattr(self.cli, "model", ""),
@@ -1053,7 +1067,7 @@ class DeliberatingAgent(AgentProcess):
                 draft = await self.cli.send(primary_prompt)
                 duration_ms = int((time.monotonic() - t0) * 1000)
                 usage = getattr(self.cli, "last_usage", None) or {}
-                await self._record_token_usage()
+                await self._record_token_usage(thread_id=envelope.thread_id)
                 await self._publish_trace(
                     "response", draft, envelope,
                     extra={
@@ -1096,7 +1110,7 @@ class DeliberatingAgent(AgentProcess):
                 critique = await self.secondary_cli.send(critique_prompt)
                 duration_ms = int((time.monotonic() - t0) * 1000)
                 usage = getattr(self.secondary_cli, "last_usage", None) or {}
-                await self._record_token_usage(self.secondary_cli)
+                await self._record_token_usage(self.secondary_cli, thread_id=envelope.thread_id)
                 await self._publish_trace(
                     "response", critique, envelope,
                     extra={
@@ -1145,7 +1159,7 @@ class DeliberatingAgent(AgentProcess):
                 repaired = await self.cli.send(repair_prompt)
                 duration_ms = int((time.monotonic() - t0) * 1000)
                 usage = getattr(self.cli, "last_usage", None) or {}
-                await self._record_token_usage()
+                await self._record_token_usage(thread_id=envelope.thread_id)
                 await self._publish_trace(
                     "response", repaired, envelope,
                     extra={

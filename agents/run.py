@@ -142,6 +142,7 @@ def cmd_web(args: argparse.Namespace) -> None:
         max_pending_tasks=config.system.max_pending_tasks,
         max_pending_reviews=config.system.max_pending_reviews,
         safety=config.safety,
+        agent_roles=list(config.agents.keys()),
         gate_timeout=config.system.gate_timeout,
         weekly_token_budget=config.system.weekly_token_budget,
         weekly_token_basis=config.system.weekly_token_basis,

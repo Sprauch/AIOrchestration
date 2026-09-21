@@ -1532,3 +1532,29 @@ tr.click { cursor: pointer; }
 .phase-step.awaiting .phase-num {
   background: var(--yellow-bg); color: var(--yellow-text); border-color: var(--yellow);
 }
+
+/* ── Usage tables ───────────────────────────────────────────────────────── */
+.ut-total { display: flex; flex-wrap: wrap; gap: 28px; margin-bottom: 14px; }
+.ut-total-num { display: block; font-family: var(--mono); font-size: 20px; font-weight: 600; }
+.ut-total-lbl { display: block; font-size: 11px; color: var(--subtle); margin-top: 2px; }
+.ut-note { font-size: 12px; color: var(--dim); line-height: 1.6; margin: 0 0 12px; }
+table.ut { width: 100%; border-collapse: collapse; font-size: 12px; }
+table.ut th {
+  text-align: left; font-size: 10px; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--subtle);
+  padding: 4px 8px 6px; border-bottom: 1px solid var(--border);
+}
+table.ut td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+table.ut tr:last-child td { border-bottom: none; }
+.ut-key { font-family: var(--mono); font-size: 11.5px; white-space: nowrap; }
+.ut-num { font-family: var(--mono); text-align: right; white-space: nowrap; }
+.ut-dim { color: var(--subtle); }
+.ut-bar { width: 38%; min-width: 80px; }
+.ut-bar span {
+  display: block; height: 6px; border-radius: 3px;
+  background: var(--accent); opacity: 0.75; min-width: 2px;
+}
+@media (max-width: 720px) {
+  .ut-bar, table.ut th:nth-child(2) { display: none; }
+  .ut-dim, table.ut th:nth-child(4), table.ut th:nth-child(5) { display: none; }
+}

@@ -52,7 +52,7 @@ class WebDashboard:
                  idle_threshold: int = 600, max_change_rounds: int = 3, stream_read_limit: int = 500,
                  max_pending_proposals: int = 3, max_pending_tasks: int = 3, max_pending_reviews: int = 5,
                  weekly_token_budget: int = 0, weekly_token_basis: str = "both",
-                 safety=None, gate_timeout: int = 0):
+                 safety=None, gate_timeout: int = 0, agent_roles=None):
         self.redis_url = redis_url
         self.port = port
         self.gate_token = gate_token
@@ -66,6 +66,7 @@ class WebDashboard:
             "reviews": max_pending_reviews,
         }
         self.safety = safety
+        self.agent_roles = agent_roles or []
         self._gate_timeout_hours = gate_timeout / 3600 if gate_timeout else 0
         self.weekly_token_budget = weekly_token_budget
         self.weekly_token_basis = weekly_token_basis
@@ -84,6 +85,7 @@ class WebDashboard:
         app.router.add_get("/api/agents/{agent_id}", self._handle_agent_detail)
         app.router.add_get("/api/streams/{stream_name}", self._handle_stream_messages)
         app.router.add_get("/api/policy", self._handle_policy)
+        app.router.add_get("/api/usage", self._handle_usage)
         app.router.add_get("/api/errors", self._handle_errors)
         app.router.add_get("/api/refused", self._handle_refused_list)
         app.router.add_post("/api/refused/{refusal_id}/reinstate", self._handle_refused_reinstate)
@@ -1308,6 +1310,94 @@ class WebDashboard:
             })
 
         return web.json_response({"errors": out})
+
+    # ── Usage ──────────────────────────────────────────────
+
+    async def _handle_usage(self, request: web.Request) -> web.Response:
+        """Tokens and cost, sliced every way that makes an anomaly visible.
+
+        A single total answers "is this expensive?" and nothing else. An anomaly is always
+        a COMPARISON — this agent against the others, this proposal against the last one,
+        this hour against the rest of the day — so the slices are the point, not the sum.
+        Reported here so that spotting one never requires leaving for external tooling.
+
+        Cost is stored as millicents (cost_mc) to keep the counters integral; it is divided
+        back out here so nothing downstream has to know that.
+        """
+        try:
+            m = await self.bus.redis.hgetall("orchestrator:metrics") or {}
+        except Exception:
+            m = {}
+
+        def num(key: str) -> int:
+            try:
+                return int(m.get(key, 0) or 0)
+            except (TypeError, ValueError):
+                return 0
+
+        def collect(prefix: str) -> dict:
+            """Every bucket under a prefix, e.g. tokens_in:day: -> {"2026-09-21": 1234}."""
+            out = {}
+            for k in m:
+                if k.startswith(prefix):
+                    out[k[len(prefix):]] = num(k)
+            return out
+
+        def rows(bucket: str, keys=None) -> list:
+            """One row per bucket key, carrying all three figures together."""
+            names = keys if keys is not None else sorted(
+                set(collect(f"tokens_in:{bucket}:"))
+                | set(collect(f"tokens_out:{bucket}:"))
+                | set(collect(f"cost_mc:{bucket}:"))
+            )
+            out = []
+            for name in names:
+                tin = num(f"tokens_in:{bucket}:{name}")
+                tout = num(f"tokens_out:{bucket}:{name}")
+                mc = num(f"cost_mc:{bucket}:{name}")
+                if not (tin or tout or mc):
+                    continue
+                out.append({
+                    "key": name,
+                    "tokens_in": tin,
+                    "tokens_out": tout,
+                    "tokens": tin + tout,
+                    "cost_usd": mc / 100_000,
+                })
+            return out
+
+        # Roles are not stored under a bucket prefix — the role IS the suffix — so they are
+        # read from the configured agent names rather than guessed from key shapes.
+        role_names = sorted(self.agent_roles) if self.agent_roles else []
+        per_role = []
+        for r in role_names:
+            tin, tout, mc = num(f"tokens_in:{r}"), num(f"tokens_out:{r}"), num(f"cost_mc:{r}")
+            if not (tin or tout or mc):
+                continue
+            per_role.append({
+                "key": r, "tokens_in": tin, "tokens_out": tout,
+                "tokens": tin + tout, "cost_usd": mc / 100_000,
+            })
+
+        per_role.sort(key=lambda r: -r["tokens"])
+        threads = sorted(rows("thread"), key=lambda r: -r["tokens"])
+        days = sorted(rows("day"), key=lambda r: r["key"], reverse=True)
+        hours = sorted(rows("hour"), key=lambda r: r["key"], reverse=True)[:48]
+        weeks = sorted(rows("week"), key=lambda r: r["key"], reverse=True)
+
+        return web.json_response({
+            "total": {
+                "tokens_in": num("tokens_in:total"),
+                "tokens_out": num("tokens_out:total"),
+                "tokens": num("tokens_in:total") + num("tokens_out:total"),
+                "cost_usd": num("cost_mc:total") / 100_000,
+            },
+            "by_role": per_role,
+            "by_thread": threads,
+            "by_week": weeks,
+            "by_day": days,
+            "by_hour": hours,
+        })
 
     # ── Refused work, and the two ways back ────────────────
 
