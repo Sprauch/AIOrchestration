@@ -9,7 +9,7 @@ import shutil
 import signal
 import subprocess
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from agents.core.base_agent import AgentProcess
@@ -511,6 +511,17 @@ class Orchestrator:
         self._spawn_agents(agent_filter, agent_id_override)
 
         await asyncio.sleep(2)
+        # A SESSION IS ONE ORCHESTRATOR RUN. "What has this run cost so far" is the
+        # question asked while watching it work, and no counter could answer it: the
+        # totals are since Redis was last cleared, which is a different question and
+        # usually a much older one.
+        session_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        try:
+            await self.bus.redis.set("orchestrator:session_id", session_id)
+            await self.bus.redis.set("orchestrator:session_started", str(time.time()))
+        except Exception:
+            logger.debug("Could not record session id", exc_info=True)
+
         mode = await ensure_mode(self.bus.redis, self.config.system.mode)
         logger.info("Orchestration mode: %s", mode)
         await self._publish_startup_triggers()

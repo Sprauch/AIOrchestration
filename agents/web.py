@@ -358,6 +358,24 @@ class WebDashboard:
             "pct": round(used * 100.0 / self.weekly_token_budget, 1) if self.weekly_token_budget else None,
         }
 
+        # SESSION USAGE, which is what the Overview states when no weekly allowance is
+        # configured. "This week" and "this session" are the same number on a fresh Redis,
+        # and calling it weekly overstates what it measures — a label should not claim a
+        # span the counter has not lived through.
+        try:
+            sid = await self.bus.redis.get("orchestrator:session_id") or "unknown"
+        except Exception:
+            sid = "unknown"
+        s_in = int(m.get(f"tokens_in:session:{sid}", 0) or 0)
+        s_out = int(m.get(f"tokens_out:session:{sid}", 0) or 0)
+        data["session_usage"] = {
+            "session_id": sid,
+            "tokens": s_in + s_out,
+            "tokens_in": s_in,
+            "tokens_out": s_out,
+            "cost_mc": int(m.get(f"cost_mc:session:{sid}", 0) or 0),
+        }
+
         # Enrich with challenger/deliberation state from recent cli-traces
 
         challengers = {}  # role -> {"active": bool, "last_seen": timestamp}
@@ -1314,20 +1332,36 @@ class WebDashboard:
     # ── Usage ──────────────────────────────────────────────
 
     async def _handle_usage(self, request: web.Request) -> web.Response:
-        """Tokens and cost, sliced every way that makes an anomaly visible.
+        """Tokens and cost as two tables, with the time periods as columns.
 
-        A single total answers "is this expensive?" and nothing else. An anomaly is always
-        a COMPARISON — this agent against the others, this proposal against the last one,
-        this hour against the rest of the day — so the slices are the point, not the sum.
-        Reported here so that spotting one never requires leaving for external tooling.
+        Two questions, two tables: which AGENT is spending, and which PROPOSAL is
+        expensive. Each row carries the same five periods, so a figure is always read
+        against its neighbours — an anomaly is a comparison, never a number on its own.
 
-        Cost is stored as millicents (cost_mc) to keep the counters integral; it is divided
-        back out here so nothing downstream has to know that.
+        Every cell needs its own counter. A per-agent total and a per-hour total cannot be
+        combined afterwards to answer "what did the architect cost this hour"; that is a
+        cross product, and it is recorded as one at the time.
+
+        Cost is stored as millicents to keep counters integral, and divided back out here.
         """
         try:
             m = await self.bus.redis.hgetall("orchestrator:metrics") or {}
         except Exception:
             m = {}
+        try:
+            session_id = await self.bus.redis.get("orchestrator:session_id") or "unknown"
+        except Exception:
+            session_id = "unknown"
+
+        now = datetime.now(timezone.utc)
+        year, week, _ = now.isocalendar()
+        buckets = {
+            "session": f"session:{session_id}",
+            "hour": now.strftime("hour:%Y-%m-%dT%H"),
+            "day": now.strftime("day:%Y-%m-%d"),
+            "week": f"week:{year}-W{week:02d}",
+            "all": "all",
+        }
 
         def num(key: str) -> int:
             try:
@@ -1335,68 +1369,51 @@ class WebDashboard:
             except (TypeError, ValueError):
                 return 0
 
-        def collect(prefix: str) -> dict:
-            """Every bucket under a prefix, e.g. tokens_in:day: -> {"2026-09-21": 1234}."""
-            out = {}
+        def cell(scope: str, name: str, bucket: str) -> dict:
+            base = f"{scope}:{name}:{bucket}"
+            tin = num(f"tokens_in:{base}")
+            tout = num(f"tokens_out:{base}")
+            return {
+                "tokens": tin + tout,
+                "tokens_in": tin,
+                "tokens_out": tout,
+                "cost_usd": num(f"cost_mc:{base}") / 100_000,
+            }
+
+        def names_for(scope: str) -> list:
+            """Every name that has ever been recorded under a scope."""
+            found = set()
             for k in m:
-                if k.startswith(prefix):
-                    out[k[len(prefix):]] = num(k)
-            return out
+                for metric in ("tokens_in:", "tokens_out:", "cost_mc:"):
+                    prefix = f"{metric}{scope}:"
+                    if k.startswith(prefix):
+                        rest = k[len(prefix):]
+                        # <name>:all or <name>:<period>:<bucket>
+                        found.add(rest.split(":")[0])
+            return sorted(found)
 
-        def rows(bucket: str, keys=None) -> list:
-            """One row per bucket key, carrying all three figures together."""
-            names = keys if keys is not None else sorted(
-                set(collect(f"tokens_in:{bucket}:"))
-                | set(collect(f"tokens_out:{bucket}:"))
-                | set(collect(f"cost_mc:{bucket}:"))
-            )
-            out = []
-            for name in names:
-                tin = num(f"tokens_in:{bucket}:{name}")
-                tout = num(f"tokens_out:{bucket}:{name}")
-                mc = num(f"cost_mc:{bucket}:{name}")
-                if not (tin or tout or mc):
+        def table(scope: str) -> list:
+            rows = []
+            for name in names_for(scope):
+                cells = {p: cell(scope, name, b) for p, b in buckets.items()}
+                if not cells["all"]["tokens"] and not cells["all"]["cost_usd"]:
                     continue
-                out.append({
-                    "key": name,
-                    "tokens_in": tin,
-                    "tokens_out": tout,
-                    "tokens": tin + tout,
-                    "cost_usd": mc / 100_000,
-                })
-            return out
-
-        # Roles are not stored under a bucket prefix — the role IS the suffix — so they are
-        # read from the configured agent names rather than guessed from key shapes.
-        role_names = sorted(self.agent_roles) if self.agent_roles else []
-        per_role = []
-        for r in role_names:
-            tin, tout, mc = num(f"tokens_in:{r}"), num(f"tokens_out:{r}"), num(f"cost_mc:{r}")
-            if not (tin or tout or mc):
-                continue
-            per_role.append({
-                "key": r, "tokens_in": tin, "tokens_out": tout,
-                "tokens": tin + tout, "cost_usd": mc / 100_000,
-            })
-
-        per_role.sort(key=lambda r: -r["tokens"])
-        threads = sorted(rows("thread"), key=lambda r: -r["tokens"])
-        days = sorted(rows("day"), key=lambda r: r["key"], reverse=True)
-        hours = sorted(rows("hour"), key=lambda r: r["key"], reverse=True)[:48]
-        weeks = sorted(rows("week"), key=lambda r: r["key"], reverse=True)
+                rows.append({"key": name, **cells})
+            # Most expensive all-time first: the row worth looking at leads.
+            rows.sort(key=lambda r: -r["all"]["tokens"])
+            return rows
 
         return web.json_response({
+            "session_id": session_id,
+            "periods": ["session", "hour", "day", "week", "all"],
+            "by_agent": table("agent"),
+            "by_proposal": table("prop"),
             "total": {
+                "tokens": num("tokens_in:total") + num("tokens_out:total"),
                 "tokens_in": num("tokens_in:total"),
                 "tokens_out": num("tokens_out:total"),
-                "tokens": num("tokens_in:total") + num("tokens_out:total"),
                 "cost_usd": num("cost_mc:total") / 100_000,
             },
-            "by_role": per_role,
-            "by_thread": threads,
-            "by_week": weeks,
-            "by_day": days,
-            "by_hour": hours,
         })
 
     # ── Refused work, and the two ways back ────────────────

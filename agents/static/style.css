@@ -1575,3 +1575,16 @@ table.ut tr:last-child td { border-bottom: none; }
 .otile { position: relative; }
 .otile-link:hover::after { opacity: 1; }
 .error-link:hover { background: var(--surface-hover); }
+
+/* ── Usage cells: tokens with their cost, together ───────────────────────── */
+.ut-cell { font-family: var(--mono); font-size: 11.5px; white-space: nowrap; text-align: right; }
+.uc-tok { color: var(--text); }
+.uc-cost { color: var(--subtle); }
+.uc-nil { color: var(--subtle); }
+table.ut th:not(:first-child) { text-align: right; }
+.ot-value-pair { font-size: 22px; white-space: nowrap; }
+@media (max-width: 720px) {
+  /* Keep every period column: dropping one turns a comparison into a number. Let the
+     table scroll instead. */
+  .card-body:has(table.ut) { overflow-x: auto; }
+}

@@ -465,29 +465,35 @@ async function refreshOverview() {
       // Both figures, because they answer different questions. The dollar amount is the
       // API-rate equivalent and is real but abstract on a subscription; the percentage
       // of the weekly allowance is the one you act on. Percentage leads.
+      // "USAGE", AND NOTHING ABOUT THE SPAN. Every label tried here claimed something
+      // the number could not back: "this week" was really "since Redis was cleared", and
+      // "this session" is a span the reader has no reason to care about from the Overview.
+      // An unqualified label claims nothing, and the tile links to the breakdown where
+      // every period is shown side by side — so the meaning is one click away instead of
+      // asserted wrongly here.
+      //
+      // The figure is the ALL-TIME total, which is the one number that matches what the
+      // Usage tab adds up to. Tokens with the API-rate equivalent beside them: "413k ($1.29)".
       (function(){
         const w=snap.weekly||{};
-        const fmtT=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?Math.round(n/1e3)+'k':String(n||0);
-        const rows=[];
-        rows.push('<div class="ot-row"><span>API rate</span><b>'+(costStr||'—')+'</b></div>');
-        rows.push('<div class="ot-row"><span>Tokens</span><b>'+fmtT(w.used||0)+'</b></div>');
+        const mt=snap.metrics||{};
         if(w.budget){
-          rows.push('<div class="ot-row"><span>Weekly allowance</span><b>'+fmtT(w.budget)+'</b></div>');
-        }
-        if(w.budget){
+          // An allowance is configured, so the percentage IS the number to act on and the
+          // weekly label is accurate.
           const pct=w.pct||0;
           const tone=pct>=90?'c-red':pct>=70?'c-amber':'c-blue';
-          return '<div class="otile otile-link '+tone+'" onclick="goToUsage()" title="Break this down per agent, per proposal, per hour"><div class="ot-label">Consumption this week</div>'
+          const pair=fmtTok(w.used||0)+' ('+usdFmt((w.cost_mc||0)/100000)+')';
+          return '<div class="otile otile-link '+tone+'" onclick="goToUsage()" title="Break this down per agent and per proposal"><div class="ot-label">Consumption this week</div>'
             +'<div class="ot-value">'+pct+'%</div>'
             +'<div class="ot-bar"><div class="ot-bar-fill" style="width:'+Math.min(pct,100)+'%"></div></div>'
-            +'<div class="ot-rows">'+rows.join('')+'</div></div>';
+            +'<div class="ot-sub">'+pair+' of '+fmtTok(w.budget)+'</div></div>';
         }
-        // No allowance configured: show what is known rather than a percentage of nothing.
-        return '<div class="otile otile-link c-blue" onclick="goToUsage()" title="Break this down per agent, per proposal, per hour"><div class="ot-label">Usage this week</div>'
-          +'<div class="ot-value">'+fmtT(w.used||0)+'</div>'
-          +'<div class="ot-rows">'+rows.join('')
-          +'<div class="ot-row ot-row-hint"><span>Set weekly_token_budget for %</span></div></div></div>';
-      })(),
+        const tokens=(parseInt(mt['tokens_in:total']||0))+(parseInt(mt['tokens_out:total']||0));
+        const cost=(parseInt(mt['cost_mc:total']||0))/100000;
+        const pair=fmtTok(tokens)+' ('+usdFmt(cost)+')';
+        return '<div class="otile otile-link c-blue" onclick="goToUsage()" title="Break this down per agent, per proposal, and per period"><div class="ot-label">Usage</div>'
+          +'<div class="ot-value ot-value-pair">'+pair+'</div></div>';
+      })()
     ].join('');
 
     // 4. Agent status strip — compact row, not full pipeline diagram
@@ -1181,33 +1187,41 @@ function usdFmt(v){
   return '$'+v.toFixed(4);
 }
 
+// ONE CELL, BOTH FIGURES: "413k ($1.29)". Tokens are what the plan is measured in and
+// the dollar amount is the API-rate equivalent — they answer different questions, and
+// splitting them across columns would double the width for no gain.
+function usageCell(c){
+  if(!c || (!c.tokens && !c.cost_usd)) return '<span class="uc-nil">—</span>';
+  return '<span class="uc-tok">'+fmtTok(c.tokens)+'</span> '
+       + '<span class="uc-cost">('+usdFmt(c.cost_usd)+')</span>';
+}
+
+const USAGE_PERIODS=[
+  ['session','Current Session'],
+  ['hour','This Hour'],
+  ['day','This Day'],
+  ['week','This Week'],
+  ['all','All Time']
+];
+
 function usageTable(title, note, rows, keyLabel, opts){
   const o=opts||{};
+  const head='<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>'
+    +esc(title)+'</h3></div><div class="card-body">'
+    +(note?'<p class="ut-note">'+esc(note)+'</p>':'');
   if(!rows||!rows.length){
-    return '<div class="card" style="margin-bottom:16px"><div class="card-head"><h3>'+esc(title)+'</h3></div>'
-      +'<div class="card-body"><div class="empty">Nothing recorded yet.</div></div></div>';
+    return head+'<div class="empty">Nothing recorded yet.</div></div></div>';
   }
-  // The largest row is the yardstick: every bar is read against it, which is what makes
-  // an outlier visible rather than merely present.
-  const max=Math.max.apply(null, rows.map(r=>r.tokens))||1;
+  const cols=USAGE_PERIODS.map(p=>'<th>'+esc(p[1])+'</th>').join('');
   const body=rows.map(r=>{
-    const pct=Math.round((r.tokens/max)*100);
-    const label=o.short?esc(String(r.key).slice(0,8)):esc(r.key);
-    return '<tr>'
-      +'<td class="ut-key">'+label+'</td>'
-      +'<td class="ut-bar"><span style="width:'+pct+'%"></span></td>'
-      +'<td class="ut-num">'+fmtTok(r.tokens)+'</td>'
-      +'<td class="ut-num ut-dim">'+fmtTok(r.tokens_in)+' in</td>'
-      +'<td class="ut-num ut-dim">'+fmtTok(r.tokens_out)+' out</td>'
-      +'<td class="ut-num">'+usdFmt(r.cost_usd)+'</td>'
-      +'</tr>';
+    const label=o.short
+      ? '<span title="'+esc(r.key)+'">'+esc(String(r.key).slice(0,8))+'</span>'
+      : esc(r.key);
+    return '<tr><td class="ut-key">'+label+'</td>'
+      + USAGE_PERIODS.map(p=>'<td class="ut-cell">'+usageCell(r[p[0]])+'</td>').join('')
+      + '</tr>';
   }).join('');
-  return '<div class="card" style="margin-bottom:16px">'
-    +'<div class="card-head"><h3>'+esc(title)+'</h3></div>'
-    +'<div class="card-body">'
-    +(note?'<p class="ut-note">'+esc(note)+'</p>':'')
-    +'<table class="ut"><thead><tr>'
-    +'<th>'+esc(keyLabel)+'</th><th></th><th>Tokens</th><th>In</th><th>Out</th><th>Cost</th>'
+  return head+'<table class="ut"><thead><tr><th>'+esc(keyLabel)+'</th>'+cols
     +'</tr></thead><tbody>'+body+'</tbody></table></div></div>';
 }
 
@@ -1218,22 +1232,13 @@ async function renderUsage(){
   try{ d=await (await fetch('/api/usage')).json(); }
   catch(e){ el.innerHTML='<div class="empty">Usage unavailable.</div>'; return; }
 
-  const t=d.total||{};
-  const head='<div class="ut-total">'
-    +'<div><span class="ut-total-num">'+fmtTok(t.tokens||0)+'</span><span class="ut-total-lbl">tokens all time</span></div>'
-    +'<div><span class="ut-total-num">'+usdFmt(t.cost_usd||0)+'</span><span class="ut-total-lbl">API-rate equivalent</span></div>'
-    +'<div><span class="ut-total-num">'+fmtTok(t.tokens_in||0)+'</span><span class="ut-total-lbl">read</span></div>'
-    +'<div><span class="ut-total-num">'+fmtTok(t.tokens_out||0)+'</span><span class="ut-total-lbl">written</span></div>'
-    +'</div>'
-    +'<p class="ut-note">Input dominates output by a wide margin in every run so far. The cost '
-    +'is what agents READ, so an agent reading more than its peers is the anomaly worth finding.</p>';
-
-  el.innerHTML=head
-    +usageTable('Per agent','Compare roles against each other. A cheap role spending like an expensive one is the signal.',d.by_role,'Agent')
-    +usageTable('Per proposal','One row per thread — the unit you actually approve. A proposal costing several times its neighbours was either much harder or went wrong.',d.by_thread,'Thread',{short:true})
-    +usageTable('Per hour','The last 48 hours. A spike here with no work to show for it is a loop.',d.by_hour,'Hour')
-    +usageTable('Per day','',d.by_day,'Day')
-    +usageTable('Per week','',d.by_week,'Week');
+  el.innerHTML=
+    usageTable('Per agent',
+      'Which role is spending. A cheap role spending like an expensive one is the signal.',
+      d.by_agent, 'Agent')
+    + usageTable('Per proposal',
+      'One row per thread — the unit you approve. A proposal costing several times its neighbours was either much harder, or went wrong.',
+      d.by_proposal, 'Proposal', {short:true});
 }
 
 // ── Refused work ──

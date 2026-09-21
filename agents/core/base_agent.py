@@ -86,6 +86,7 @@ class AgentProcess(ABC):
         self._publish_hashes: OrderedDict[str, int] = OrderedDict()  # hash -> count, LRU dedup
         self._thread_guard: ThreadGuard | None = None
         self._last_gate_outcome = "denied"  # "denied" or "expired"; set when a gate resolves
+        self._session_id: str | None = None  # one orchestrator run; read once from Redis
 
         # Resolve channels
         defaults = self.default_channels()
@@ -312,6 +313,14 @@ class AgentProcess(ABC):
         year, week, _ = now.isocalendar()
         wk = f"{year}-W{week:02d}"
 
+        # The session id is written once by the orchestrator at startup and never changes
+        # while it runs, so it is read once and kept.
+        if self._session_id is None:
+            try:
+                self._session_id = await self.bus.redis.get("orchestrator:session_id") or "unknown"
+            except Exception:
+                self._session_id = "unknown"
+
         # SPEND IS ONLY LEGIBLE WHEN IT CAN BE SLICED. A single total answers "is this
         # expensive?" and nothing else. Anomalies show up as a comparison: this agent
         # against the others, this proposal against the last one, this hour against the
@@ -322,14 +331,34 @@ class AgentProcess(ABC):
         # Per THREAD, which is per proposal: the unit the operator actually approves.
         thr = (thread_id or "").strip()
 
+        # PERIODS ARE COLUMNS, so the counters have to be a cross product: this agent in
+        # this hour, this proposal in this session. A per-agent total and a per-hour total
+        # cannot be combined after the fact to answer "what did the architect cost this
+        # hour" — that question needs its own counter, written at the time.
+        periods = (
+            ("session", self._session_id),
+            ("hour", hour),
+            ("day", day),
+            ("week", wk),
+        )
+
         def add(metric: str, value: int) -> None:
+            # Legacy flat keys, still read by the weekly tile and the older views.
             increments[f"{metric}:{self.role}"] = value
             increments[f"{metric}:total"] = value
             increments[f"{metric}:week:{wk}"] = value
             increments[f"{metric}:day:{day}"] = value
             increments[f"{metric}:hour:{hour}"] = value
+            increments[f"{metric}:session:{self._session_id}"] = value
             if thr:
                 increments[f"{metric}:thread:{thr}"] = value
+
+            # Explicitly scoped keys: <metric>:agent|prop:<name>:<period>:<bucket>
+            scopes = [("agent", self.role)] + ([("prop", thr)] if thr else [])
+            for scope, name in scopes:
+                increments[f"{metric}:{scope}:{name}:all"] = value
+                for period, bucket in periods:
+                    increments[f"{metric}:{scope}:{name}:{period}:{bucket}"] = value
 
         if inp:
             add("tokens_in", inp)
